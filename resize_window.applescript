@@ -44,7 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 set u_dash to Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 set menu_rule to my multiply_text(u_dash, 21)
 
-set size_adjustment_list to {"Width + 1px", "Width - 1px"}
+set size_adjustment_list to {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
 
 set size_list to paragraphs of "320x480	iPhone Portrait (640x960)
 480x320	iPhone Landscape (960x640)
@@ -91,10 +91,14 @@ if size_choice is size_list's last item then
 	return
 else if size_choice is in size_adjustment_list then
 	-- Currently we're only adjusting the width, so no need for specific variables
-	if size_choice is size_adjustment_list's first item then
+	if size_choice is size_adjustment_list's item 1 then
 		set size_adjustment to 1
-	else
+	else if size_choice is size_adjustment_list's item 2 then
 		set size_adjustment to -1
+	else if size_choice is size_adjustment_list's item 3 then
+		set size_adjustment to 10
+	else
+		set size_adjustment to -10
 	end if
 	set win_right to win_right + size_adjustment
 	tell application "Safari" to set bounds of window 1 to {win_left, win_top, win_right, win_bottom}
