@@ -45,6 +45,7 @@ set u_dash to Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 set menu_rule to my multiply_text(u_dash, 21)
 
 set size_adjustment_list to {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
+set custom_choice to "Custom sizeÉ"
 
 set size_list to paragraphs of "320x480	iPhone Portrait (640x960)
 480x320	iPhone Landscape (960x640)
@@ -58,6 +59,7 @@ set size_list to paragraphs of "320x480	iPhone Portrait (640x960)
 1366x768	WXGA (16:9)" & Â
 	menu_rule & Â
 	size_adjustment_list & Â
+	custom_choice & Â
 	menu_rule & Â
 	"Show front browser window size"
 
@@ -89,6 +91,9 @@ if size_choice is size_list's last item then
 	set m to cur_width & "x" & cur_height as text
 	display alert "Safari front window size" message m buttons {"OK"} default button 1
 	return
+else if size_choice is custom_choice then
+	set m to "Type in a custom width and height separated by an \"x\":"
+	set size_choice to text returned of (display dialog m with title t default answer "1024x768")
 else if size_choice is in size_adjustment_list then
 	-- Currently we're only adjusting the width, so no need for specific variables
 	if size_choice is size_adjustment_list's item 1 then
@@ -106,14 +111,34 @@ else if size_choice is in size_adjustment_list then
 end if
 
 
--- Parse size choice
-set size_choice to split_text(size_choice, tab)'s first item
-set {new_width, new_height} to split_text(size_choice, "x")
+-- Parse and validate size choice
+set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
+
+try
+	set size_choice to split_text(size_choice, tab)'s first item
+	set {new_width, new_height} to split_text(size_choice, "x")
+on error
+	set txt to "Invalid window size"
+	error_with_alert(txt, msg)
+end try
+
+if new_width is "" or new_height is "" then
+	set txt to "Invalid width and/or height"
+	error_with_alert(txt, msg)
+end if
+
+try
+	new_width as integer
+	new_height as integer
+on error
+	set txt to "Invalid width and/or height"
+	set msg to "Width and height must be integers."
+	error_with_alert(txt, msg)
+end try
 --return {new_width, new_height} -- :DEBUG:
 
 
 -- Check for size adjustments
-
 set m to "Resize both the browser window's width and height or just the width?"
 set b to {"Cancel", "Width & Height", "Width-only"}
 set dimension_choice to button returned of (display dialog m with title t buttons b default button 3)
@@ -153,6 +178,11 @@ end tell
 
 
 (* == Subroutines == *)
+
+on error_with_alert(txt, msg)
+	display alert txt message msg as critical buttons {"Cancel"} default button 1
+	error number -128 -- User canceled
+end error_with_alert
 
 on multiply_text(str, n)
 	if n < 1 or str = "" then return ""
