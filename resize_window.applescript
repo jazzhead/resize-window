@@ -39,6 +39,24 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***********************************************************************)
 
+property __SCRIPT_NAME__ : "Resize Window"
+property __SCRIPT_VERSION__ : "@@VERSION@@"
+property __SCRIPT_AUTHOR__ : "Steve Wheeler"
+property __SCRIPT_COPYRIGHT__ : "Copyright © 2014 " & __SCRIPT_AUTHOR__
+property __SCRIPT_WEBSITE__ : "http://jazzheaddesign.com/work/code/safari-resize-window/"
+property __SCRIPT_LICENSE_SUMMARY__ : "This program is free software available under the terms of a BSD-style (3-clause) open source license. Click the \"License\" button or see the README file included with the distribution for details."
+property __SCRIPT_LICENSE__ : __SCRIPT_COPYRIGHT__ & return & "All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+  ¥ Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+  ¥ Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+  ¥ Neither the name of the copyright holder nor the names of contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
+
 (* == Initializations == *)
 
 set u_dash to Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
@@ -61,17 +79,19 @@ set size_list to paragraphs of "320x480	iPhone Portrait (640x960)
 	size_adjustment_list & Â
 	custom_choice & Â
 	menu_rule & Â
-	"Show front browser window size"
+	"Show front browser window size" & Â
+	("About " & __SCRIPT_NAME__)
 
 set mac_menu_bar to 22
 
 
 (* == Main == *)
 
-set t to "Safari Ñ Resize Window"
+set dialog_title to "Safari Ñ " & __SCRIPT_NAME__
+
 set m to "Choose a browser window size:"
 repeat -- until a horizontal rule is not selected
-	set size_choice to choose from list size_list default items {size_list's item 8} with title t with prompt m with multiple selections allowed
+	set size_choice to choose from list size_list default items {size_list's item 8} with title dialog_title with prompt m with multiple selections allowed
 	if size_choice as string is not menu_rule then
 		exit repeat
 	else
@@ -88,12 +108,29 @@ tell application "Safari"
 end tell
 
 if size_choice is size_list's last item then
+	set t to __SCRIPT_NAME__
+	set b to {"License", "Website", "OK"}
+	set m to Â
+		"Resize frontmost Safari browser window." & return & return Â
+		& "Version " & __SCRIPT_VERSION__ & return & return & return & return Â
+		& __SCRIPT_COPYRIGHT__ & return & return Â
+		& __SCRIPT_LICENSE_SUMMARY__ & return
+	display alert t message m buttons b default button 3
+	set btn_choice to button returned of result
+	if btn_choice is b's item 1 then
+		display alert t message __SCRIPT_LICENSE__
+	else if btn_choice is b's item 2 then
+		open location __SCRIPT_WEBSITE__
+	end if
+	return
+else if size_choice is size_list's item -2 then
 	set m to cur_width & "x" & cur_height as text
 	display alert "Safari front window size" message m buttons {"OK"} default button 1
 	return
 else if size_choice is custom_choice then
 	set m to "Type in a custom width and height separated by an \"x\":"
-	set size_choice to text returned of (display dialog m with title t default answer "1024x768")
+	display dialog m with title dialog_title default answer "1024x768"
+	set size_choice to text returned of result
 else if size_choice is in size_adjustment_list then
 	-- Currently we're only adjusting the width, so no need for specific variables
 	if size_choice is size_adjustment_list's item 1 then
@@ -141,7 +178,8 @@ end try
 -- Check for size adjustments
 set m to "Resize both the browser window's width and height or just the width?"
 set b to {"Cancel", "Width & Height", "Width-only"}
-set dimension_choice to button returned of (display dialog m with title t buttons b default button 3)
+display dialog m with title dialog_title buttons b default button 3
+set dimension_choice to button returned of result
 if dimension_choice is b's item 3 then
 	set is_width_only to true
 else
@@ -151,7 +189,8 @@ end if
 if not is_width_only then
 	set m to "Subtract Mac Menu Bar height (" & mac_menu_bar & "px)?"
 	set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
-	set mac_menu_choice to button returned of (display dialog m with title t buttons b default button 3)
+	display dialog m with title dialog_title buttons b default button 3
+	set mac_menu_choice to button returned of result
 	if mac_menu_choice is b's item 2 then
 		set should_subtract_mac_menu to true
 	else
