@@ -1,0 +1,42 @@
+# This is a commented version of the doc.ed.txt file because the BSD version of
+# ed doesn't allow comments (as far as I can tell).
+
+# Print error explanations for debugging:
+H
+
+# Set document size to 8.5" x 11" (1400 twips per inch) assuming there is
+# only one line matching `}\\deftab720$`.
+#
+/}\\deftab720$/a
+\vieww11900\viewh15400\viewkind0
+.
+
+# Add horizontal rule (table border (bottom-only) since OS X's TextEdit doesn't
+# support RTF horizontal lines) where the last HTML horizontal rule of the
+# document was:
+#
+#   -\pard\pardeftab720\sa140
+#   +\pard \trowd \trgaph180 \clbrdrt\brdrw0\brdrs \clbrdrl\brdrw0\brdrs \clbrdrb\brdrw15\brdrs \clbrdrr\brdrw0\brdrs \cellx1440 \pard\intbl\cell \row \par
+#
+?^\\pard\\pardeftab720\\sa140$?s//\\pard \\trowd \\trgaph180 \\clbrdrt\\brdrw0\\brdrs \\clbrdrl\\brdrw0\\brdrs \\clbrdrb\\brdrw15\\brdrs \\clbrdrr\\brdrw0\\brdrs \\cellx1440 \\pard\\intbl\\cell \\row \\par/
+
+# Add 32pt margin (32 x 20 = 640 twips) above first H2 heading (which should be
+# the Description heading right after the front matter table since the RTF
+# isn't picking up the margins on the table from the HTML/CSS):
+#
+#   -\pard\pardeftab720\sa348
+#   +\pard\pardeftab720\sb640\sa348
+#
+/^\(\\pard\\pardeftab720\)\(\\sa348\)/s//\1\\sb640\2/
+
+# Add 16pt margin (16 x 20 = 320 twips) above the rest of the H2 headings:
+#
+g/^\(\\pard\\pardeftab720\)\(\\sa348\)/s//\1\\sb320\2/
+
+# Set document to read-only (non-standard?):
+#
+/^\({\\rtf1\\.*\)/s//\1\\readonlydoc1/
+
+# Switch to command mode (just to be sure) and save changes
+.
+wq

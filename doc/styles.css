@@ -1,0 +1,31 @@
+body {
+    font-family: "Helvetica Neue";
+    font-size: 14px;
+    margin: 0.5in;  /* ignored by textutil HTML to RTF conversion */
+}
+
+em {
+    font-size: 12px;
+}
+
+/* Ignored by textutil HTML to RTF conversion.
+ * Use 'ed' to add `style="text-align:center"` to `<p>` tags containing `<img>`
+ * tags instead. CSS3 doesn't have parent selectors such as `p < img` so that
+ * `text-align` rule can't be added with CSS alone to only `<p>` tags
+ * containing `<img>` tags.
+p > img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+*/
+
+table {
+    margin-bottom: 2em;  /* ignored by textutil HTML to RTF conversion */
+}
+
+/* ignored by textutil HTML to RTF conversion
+tr {
+    line-height: 0.8;
+}
+*/

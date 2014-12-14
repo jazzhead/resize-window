@@ -1,0 +1,10 @@
+H
+/}\\deftab720$/a
+\vieww11900\viewh15400\viewkind0
+.
+?^\\pard\\pardeftab720\\sa140$?s//\\pard \\trowd \\trgaph180 \\clbrdrt\\brdrw0\\brdrs \\clbrdrl\\brdrw0\\brdrs \\clbrdrb\\brdrw15\\brdrs \\clbrdrr\\brdrw0\\brdrs \\cellx1440 \\pard\\intbl\\cell \\row \\par/
+/^\(\\pard\\pardeftab720\)\(\\sa348\)/s//\1\\sb640\2/
+g/^\(\\pard\\pardeftab720\)\(\\sa348\)/s//\1\\sb320\2/
+/^\({\\rtf1\\.*\)/s//\1\\readonlydoc1/
+.
+wq
