@@ -2,17 +2,23 @@
 #
 # Makefile for Resize Window
 #
-# @author  Steve Wheeler
+# Website: http://jazzheaddesign.com/work/code/resize-window/
+# Author:  Steve Wheeler
 #
 ##############################################################################
 
+# **BEFORE** tagging release, update version number.
+#
 # Version used for distributions (when there is no git repo).
-# BEFORE tagging release, update version number.
-VERSION       = 0.1.0
-# BEFORE tagging the release, update the release date.
-RELEASE_DATE  = 2014-12-13
+VERSION       = 0.1.1
 
 SHELL         = /bin/sh
+
+# Make will use the current date when inserting the release date into the
+# generated compiled script and README file. To override with a specific
+# date, pass a date on the command-line when calling make, i.e.,
+# `make RELEASE_DATE=YYYY-MM-DD`
+RELEASE_DATE := $(shell date "+%F")
 
 
 # If run from a git repo, then override the version above with
@@ -30,25 +36,29 @@ RELEASE_DATE_FULL := $(shell date -j -f "%F" "$(RELEASE_DATE)" "+%B %e, %Y" \
 # File names
 SOURCE        = resize_window.applescript
 BASENAME      = Resize\ Window
-PACKAGE       = safari-resize-window
+PACKAGE       = resize-window
 
 # Locations
 prefix        = $(HOME)
-bindir        = $(prefix)/Library/Scripts/Applications/Safari
-BUILD         = build
+bindir        = $(prefix)/Library/Scripts/General
+BUILD         = _build
 DOC_DIR       = doc
 
 # Output files
 TARGET       := $(BASENAME).scpt
 DOC_FILE     := $(BASENAME)\ README.rtfd
-# Temporary file
-HTML_FILE    := $(DOC_DIR)/readme.html
+# Distribution archive file basename
+ARCHIVE      := $(PACKAGE)-$(VERSION)
 
 # Documentation source files (text files in concatenation order)
 TEXT_FILES    = readme.md LICENSE
 DOC_SRC      := $(patsubst %,$(DOC_DIR)/%,$(TEXT_FILES))
 HTML_LAYOUT  := $(DOC_DIR)/layout.erb
 FPO_DIR       = dev/fpo
+# Temporary file
+HTML_FILE    := $(DOC_DIR)/readme.html
+# ed commands for tweaking RTF formatting
+ED_COMMANDS  := $(DOC_DIR)/doc.ed.txt
 
 # Output file paths
 PROG         := $(BUILD)/$(TARGET)
@@ -58,17 +68,14 @@ DOC_TARGET   := $(BUILD)/$(DOC_FILE)
 # without the escapes to use for AppleScript (osascript)
 TARGET_AS    := $(subst \,,$(TARGET))
 
-# Distribution archive file basename
-ARCHIVE      := $(PACKAGE)-$(VERSION)
-
 # Tools
 RM            = rm -rf
+ED            = ed -s
 SED           = LANG=C sed
 MKDIR         = mkdir -p
 MARKDOWN      = kramdown
 MARKDOWN_OPT := --no-auto-ids --entity-output :numeric --template $(HTML_LAYOUT)
 ARCHIVE_CMD   = ditto -c -k --sequesterRsrc --keepParent
-ED_COMMANDS   = doc.ed.txt
 
 # Set the type (-t) and creator (-c) codes when compiling just like
 # AppleScript Editor does. The codes are useful for Spotlight searches.
@@ -147,7 +154,7 @@ $(DOC_TARGET): $(HTML_FILE)
 	@echo "--->  Removing temporary HTML file..."
 	@$(RM) $<
 	@echo "--->  Tweaking RTF documentation formatting with 'ed' commands..."
-	@ed -s $(DOC_TARGET)/TXT.rtf < $(ED_COMMANDS) >/dev/null 2>&1
+	@$(ED) $(DOC_TARGET)/TXT.rtf < $(ED_COMMANDS) >/dev/null 2>&1
 	@touch -r "$(DOC_DIR)/readme.md" "$@"
 	@touch -r "$(DOC_DIR)/readme.md" $(DOC_TARGET)/TXT.rtf
 
@@ -158,13 +165,14 @@ $(HTML_FILE): $(DOC_SRC)
 		false; \
 	fi
 	@# Make substitutions (version, etc.) before passing to Markdown parser
-	@cat $^ | $(SED) -e 's/@@VERSION@@/$(VERSION)/g' -e 's/(c)/\&copy;/g' \
+	@cat $^ | $(SED) -e 's/@@VERSION@@/$(VERSION)/g' -e 's/ (c) / \&copy; /g' \
+		-e 's/[[:<:]]\(20[0-9][0-9]\)-\(20[0-9][0-9]\)[[:>:]]/\1--\2/g' \
 		-e 's/@@RELEASE_DATE@@/$(RELEASE_DATE_FULL)/g' \
 		| $(MARKDOWN) $(MARKDOWN_OPT) > $@
 	@# Center the images since textutil ignores CSS margin auto on p > img
 	@printf "%s\n" H \
 	    'g/^\(<p\)\(><img \)/s//\1 style="text-align:center"\2/' . w | \
-	    ed -s $@ >/dev/null 2>&1
+	    $(ED) $@ >/dev/null 2>&1
 
 
 # ==== FUNCTIONS =============================================================
