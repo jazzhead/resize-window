@@ -1,6 +1,5 @@
-(***********************************************************************
-
-Resize Window - Resize frontmost Safari browser window
+(*
+Resize Window - Resize front window of any application
 
 @version @@VERSION@@
 @date @@RELEASE_DATE@@
@@ -8,9 +7,10 @@ Resize Window - Resize frontmost Safari browser window
 
 This program is free software available under the terms of a BSD-style
 (3-clause) open source license detailed below.
+*)
 
-************************************************************************
-Copyright (c) 2014 Steve Wheeler  
+(*
+Copyright (c) 2014-2015 Steve Wheeler
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -37,13 +37,13 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-***********************************************************************)
+*)
 
 property __SCRIPT_NAME__ : "Resize Window"
 property __SCRIPT_VERSION__ : "@@VERSION@@"
 property __SCRIPT_AUTHOR__ : "Steve Wheeler"
-property __SCRIPT_COPYRIGHT__ : "Copyright © 2014 " & __SCRIPT_AUTHOR__
-property __SCRIPT_WEBSITE__ : "http://jazzheaddesign.com/work/code/safari-resize-window/"
+property __SCRIPT_COPYRIGHT__ : "Copyright © 2014Ð2015 " & __SCRIPT_AUTHOR__
+property __SCRIPT_WEBSITE__ : "http://jazzheaddesign.com/work/code/resize-window/"
 property __SCRIPT_LICENSE_SUMMARY__ : "This program is free software available under the terms of a BSD-style (3-clause) open source license. Click the \"License\" button or see the README file included with the distribution for details."
 property __SCRIPT_LICENSE__ : __SCRIPT_COPYRIGHT__ & return & "All rights reserved.
 
@@ -57,13 +57,17 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
 
-(* == Initializations == *)
+(* ==== Initializations ==== *)
+
+global dialog_title, size_adjustment_list, custom_choice, size_list, mac_menu_bar
+
+set dialog_title to __SCRIPT_NAME__
+set size_adjustment_list to {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
+set custom_choice to "Custom sizeÉ"
+set mac_menu_bar to 22
 
 set u_dash to Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 set menu_rule to my multiply_text(u_dash, 21)
-
-set size_adjustment_list to {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
-set custom_choice to "Custom sizeÉ"
 
 set size_list to paragraphs of "320x480	iPhone Portrait (640x960)
 480x320	iPhone Landscape (960x640)
@@ -79,17 +83,16 @@ set size_list to paragraphs of "320x480	iPhone Portrait (640x960)
 	size_adjustment_list & Â
 	custom_choice & Â
 	menu_rule & Â
-	"Show front browser window size" & Â
+	"Show front window size" & Â
 	("About " & __SCRIPT_NAME__)
 
-set mac_menu_bar to 22
 
+(* ==== Main ==== *)
 
-(* == Main == *)
+set current_app to get_front_app_name()
 
-set dialog_title to "Safari Ñ " & __SCRIPT_NAME__
-
-set m to "Choose a browser window size:"
+-- Prompt for desired window size
+set m to "Choose a size for " & current_app & "'s front window:"
 repeat -- until a horizontal rule is not selected
 	set size_choice to choose from list size_list default items {size_list's item 8} with title dialog_title with prompt m with multiple selections allowed
 	if size_choice as string is not menu_rule then
@@ -101,102 +104,22 @@ end repeat
 if size_choice is false then error number -128 -- User canceled
 set size_choice to size_choice as string
 
-tell application "Safari"
+-- Get current window size
+tell application current_app
 	set {win_left, win_top, win_right, win_bottom} to bounds of window 1
 	set cur_width to win_right - win_left
 	set cur_height to win_bottom - win_top
 end tell
 
-if size_choice is size_list's last item then
-	set t to __SCRIPT_NAME__
-	set b to {"License", "Website", "OK"}
-	set m to Â
-		"Resize frontmost Safari browser window." & return & return Â
-		& "Version " & __SCRIPT_VERSION__ & return & return & return & return Â
-		& __SCRIPT_COPYRIGHT__ & return & return Â
-		& __SCRIPT_LICENSE_SUMMARY__ & return
-	display alert t message m buttons b default button 3
-	set btn_choice to button returned of result
-	if btn_choice is b's item 1 then
-		display alert t message __SCRIPT_LICENSE__
-	else if btn_choice is b's item 2 then
-		open location __SCRIPT_WEBSITE__
-	end if
-	return
-else if size_choice is size_list's item -2 then
-	set m to cur_width & "x" & cur_height as text
-	display alert "Safari front window size" message m buttons {"OK"} default button 1
-	return
-else if size_choice is custom_choice then
-	set m to "Type in a custom width and height separated by an \"x\":"
-	display dialog m with title dialog_title default answer "1024x768"
-	set size_choice to text returned of result
-else if size_choice is in size_adjustment_list then
-	-- Currently we're only adjusting the width, so no need for specific variables
-	if size_choice is size_adjustment_list's item 1 then
-		set size_adjustment to 1
-	else if size_choice is size_adjustment_list's item 2 then
-		set size_adjustment to -1
-	else if size_choice is size_adjustment_list's item 3 then
-		set size_adjustment to 10
-	else
-		set size_adjustment to -10
-	end if
-	set win_right to win_right + size_adjustment
-	tell application "Safari" to set bounds of window 1 to {win_left, win_top, win_right, win_bottom}
-	return
-end if
-
+-- Handle user choice
+set size_choice to handle_user_action(size_choice, cur_width, cur_height, current_app)
+if size_choice is false then return
 
 -- Parse and validate size choice
-set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
-
-try
-	set size_choice to split_text(size_choice, tab)'s first item
-	set {new_width, new_height} to split_text(size_choice, "x")
-on error
-	set txt to "Invalid window size"
-	error_with_alert(txt, msg)
-end try
-
-if new_width is "" or new_height is "" then
-	set txt to "Invalid width and/or height"
-	error_with_alert(txt, msg)
-end if
-
-try
-	new_width as integer
-	new_height as integer
-on error
-	set txt to "Invalid width and/or height"
-	set msg to "Width and height must be integers."
-	error_with_alert(txt, msg)
-end try
---return {new_width, new_height} -- :DEBUG:
-
+set {new_width, new_height} to validate_window_size(size_choice)
 
 -- Check for size adjustments
-set m to "Resize both the browser window's width and height or just the width?"
-set b to {"Cancel", "Width & Height", "Width-only"}
-display dialog m with title dialog_title buttons b default button 3
-set dimension_choice to button returned of result
-if dimension_choice is b's item 3 then
-	set is_width_only to true
-else
-	set is_width_only to false
-end if
-
-if not is_width_only then
-	set m to "Subtract Mac Menu Bar height (" & mac_menu_bar & "px)?"
-	set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
-	display dialog m with title dialog_title buttons b default button 3
-	set mac_menu_choice to button returned of result
-	if mac_menu_choice is b's item 2 then
-		set should_subtract_mac_menu to true
-	else
-		set should_subtract_mac_menu to false
-	end if
-end if
+set {is_width_only, should_subtract_mac_menu} to which_dimensions()
 
 
 -- Calculate new window size
@@ -211,17 +134,140 @@ end if
 
 
 -- Resize window
-tell application "Safari"
+tell application current_app
 	set bounds of window 1 to {win_left, win_top, win_right, win_bottom}
 end tell
 
 
-(* == Subroutines == *)
+(* ==== Subroutines ==== *)
 
 on error_with_alert(txt, msg)
 	display alert txt message msg as critical buttons {"Cancel"} default button 1
 	error number -128 -- User canceled
 end error_with_alert
+
+on get_front_app_name()
+	tell application "System Events"
+		
+		-- Ignore (Apple)Script Editor and Terminal when getting the front app
+		-- name since most of the time they will just be used during
+		-- development and testing to run the script.
+		repeat 10 times -- limit repetitions just in case
+			set frontmost_process to first process where it is frontmost
+			if short name of frontmost_process is in {"Script Editor", "AppleScript Editor", "Terminal"} then
+				set original_process to frontmost_process
+				set visible of original_process to false
+				repeat while (original_process is frontmost)
+					delay 0.2
+				end repeat
+			else
+				exit repeat
+			end if
+		end repeat
+		set current_app to short name of frontmost_process
+		try -- if we hid a process
+			set frontmost of original_process to true -- return orginal app to front
+		end try
+	end tell
+	return current_app
+end get_front_app_name
+
+on handle_user_action(size_choice, cur_width, cur_height, current_app)
+	if size_choice is size_list's last item then
+		set t to __SCRIPT_NAME__
+		set b to {"License", "Website", "OK"}
+		set m to Â
+			"Resize front window of any application." & return & return Â
+			& "Version " & __SCRIPT_VERSION__ & return & return & return & return Â
+			& __SCRIPT_COPYRIGHT__ & return & return Â
+			& __SCRIPT_LICENSE_SUMMARY__ & return
+		display alert t message m buttons b default button 3
+		set btn_choice to button returned of result
+		if btn_choice is b's item 1 then
+			display alert t message __SCRIPT_LICENSE__
+		else if btn_choice is b's item 2 then
+			open location __SCRIPT_WEBSITE__
+		end if
+		return false
+	else if size_choice is size_list's item -2 then
+		set m to cur_width & "x" & cur_height as text
+		display alert current_app & " front window size" message m buttons {"OK"} default button 1
+		return false
+	else if size_choice is custom_choice then
+		set m to "Type in a custom width and height separated by an \"x\":"
+		display dialog m with title dialog_title default answer "1024x768"
+		set size_choice to text returned of result
+	else if size_choice is in size_adjustment_list then
+		-- Currently we're only adjusting the width, so no need for specific variables
+		if size_choice is size_adjustment_list's item 1 then
+			set size_adjustment to 1
+		else if size_choice is size_adjustment_list's item 2 then
+			set size_adjustment to -1
+		else if size_choice is size_adjustment_list's item 3 then
+			set size_adjustment to 10
+		else
+			set size_adjustment to -10
+		end if
+		set win_right to win_right + size_adjustment
+		tell application current_app to set bounds of window 1 to {win_left, win_top, win_right, win_bottom}
+		return false
+	end if
+	return size_choice
+end handle_user_action
+
+on validate_window_size(size_choice)
+	set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
+	
+	try
+		set size_choice to split_text(size_choice, tab)'s first item
+		set {new_width, new_height} to split_text(size_choice, "x")
+	on error
+		set txt to "Invalid window size"
+		error_with_alert(txt, msg)
+	end try
+	
+	if new_width is "" or new_height is "" then
+		set txt to "Invalid width and/or height"
+		error_with_alert(txt, msg)
+	end if
+	
+	try
+		new_width as integer
+		new_height as integer
+	on error
+		set txt to "Invalid width and/or height"
+		set msg to "Width and height must be integers."
+		error_with_alert(txt, msg)
+	end try
+	
+	return {new_width, new_height}
+end validate_window_size
+
+on which_dimensions()
+	local dimension_choice, m, b
+	set m to "Resize both the window's width and height or just the width?"
+	set b to {"Cancel", "Width & Height", "Width-only"}
+	display dialog m with title dialog_title buttons b default button 3
+	set dimension_choice to button returned of result
+	if dimension_choice is b's item 3 then
+		set is_width_only to true
+	else
+		set is_width_only to false
+	end if
+	
+	set should_subtract_mac_menu to false
+	if not is_width_only then
+		set m to "Subtract Mac Menu Bar height (" & mac_menu_bar & "px)?"
+		set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
+		display dialog m with title dialog_title buttons b default button 3
+		set mac_menu_choice to button returned of result
+		if mac_menu_choice is b's item 2 then
+			set should_subtract_mac_menu to true
+		end if
+	end if
+	
+	return {is_width_only, should_subtract_mac_menu}
+end which_dimensions
 
 on multiply_text(str, n)
 	if n < 1 or str = "" then return ""
