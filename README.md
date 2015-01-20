@@ -1,10 +1,11 @@
 Resize Window
 =============
 
-[Resize Window][website] is an AppleScript for Mac OS X that quickly resizes
-the frontmost Safari web browser window to some common sizes as well as custom
-sizes and increments. The script is useful when designing responsive websites
-that adapt to different sizes.
+[Resize Window][website] is an AppleScript program for Mac OS X that quickly
+resizes the frontmost window of any application to some common sizes as well as
+custom sizes and increments. Although the script works with any Mac
+application, it is most useful for resizing web browser windows while designing
+responsive websites that adapt to different sizes.
 
 
 Features
@@ -16,13 +17,13 @@ Features
 * Choose to adjust only the width or both the width and the height.
 * When adjusting the height, choose whether or not to subtract the OS X menu
   bar height.
-* Display the current browser window size.
+* Display the current window size.
 
-_Note: The sizes refer to the overall size of the Safari window and not the
-interior document size minus the browser window chrome on OS X or iOS. So the
-smaller sizes are mostly useful for just testing the width. A few FPO images
-are included along with the script though for loading into a browser window and
-quickly eyeballing the fit and manually adjusting the window height._
+_Note: The sizes refer to the overall size of the window and not the interior
+document size minus the window chrome. So the smaller sizes are mostly useful
+for just testing the width for mobile devices. A few FPO images are included
+along with the script though for loading into a browser window and quickly
+eyeballing the fit and manually adjusting the window height._
 
 
 Screen Shots
@@ -52,7 +53,7 @@ $ make install
 
 That uses `osacompile` to create a compiled AppleScript named "Resize
 Window.scpt" from the source file and installs it in a
-`~/Library/Scripts/Applications/Safari` directory.
+`~/Library/Scripts/General` directory.
 
 ### Enable the Script Menu
 
@@ -80,12 +81,12 @@ Resize Window was written by [Steve Wheeler](http://swheeler.com/).
 License
 -------
 
-Copyright &copy; 2014 Steve Wheeler.
+Copyright &copy; 2014--2015 Steve Wheeler.
 
 This program is free software available under the terms of a BSD-style
 (3-clause) open source license. See the [LICENSE] file for details.
 
 
-  [website]: http://jazzheaddesign.com/work/code/safari-resize-window/
-  [issue tracker]: https://github.com/jazzhead/safari-resize-window/issues
+  [website]: http://jazzheaddesign.com/work/code/resize-window/
+  [issue tracker]: https://github.com/jazzhead/resize-window/issues
   [LICENSE]: LICENSE

@@ -7,15 +7,16 @@ Resize Window
 **Website:**       |  [jazzheaddesign.com][website]
 **Requirements:**  |  Mac OS X
 
-  [website]: http://jazzheaddesign.com/work/code/safari-resize-window/
+  [website]: http://jazzheaddesign.com/work/code/resize-window/
 
 Description
 -----------
 
-Resize Window is an AppleScript for Mac OS X that quickly resizes the frontmost
-Safari web browser window to some common sizes as well as custom sizes and
-increments. The script is useful when designing responsive websites that adapt
-to different sizes.
+Resize Window is an AppleScript program for Mac OS X that quickly resizes the
+frontmost window of any application to some common sizes as well as custom
+sizes and increments. Although the script works with any Mac application, it is
+most useful for resizing web browser windows while designing responsive
+websites that adapt to different sizes.
 
 
 Features
@@ -27,7 +28,7 @@ Features
 * Choose to adjust only the width or both the width and the height.
 * When adjusting the height, choose whether or not to subtract the OS X menu
   bar height.
-* Display the current browser window size.
+* Display the current window size.
 
 <!--
 The following horizontal rule is a kludge to get a paragraph space in the RTF
@@ -36,11 +37,11 @@ file. It is replaced with just an empty paragraph, not an RTF horizontal rule.
 
 ---
 
-_Note: The sizes refer to the overall size of the Safari window and not the
-interior document size minus the browser window chrome on OS X or iOS. So the
-smaller sizes are mostly useful for just testing the width. A few FPO images
-are included along with the script though for loading into a browser window and
-quickly eyeballing the fit and manually adjusting the window height._
+_Note: The sizes refer to the overall size of the window and not the interior
+document size minus the window chrome. So the smaller sizes are mostly useful
+for just testing the width for mobile devices. A few FPO images are included
+along with the script though for loading into a browser window and quickly
+eyeballing the fit and manually adjusting the window height._
 
 
 Screen Shots
@@ -61,12 +62,13 @@ Installation
 ### Create the Installation Folder
 
 The script needs to be installed in the Scripts folder in the Library folder of
-your home directory. Specifically, it needs to be installed in
-`~/Library/Scripts/Applications/Safari`. If any of those folders do not exist
-yet on your system, go ahead and create them. The Library folder will already
-exist but may not be visible in the Finder in Mac OS X Lion (10.7) or later.
-To get to the invisible Library folder, Option-click the Finder's Go menu and
-select the Library menu item that appears.
+your home directory. Since the script can be used with any application, if you
+like to keep your scripts grouped, you may want to put it in a subdirectory
+such as "General", i.e., `~/Library/Scripts/General`. If any of those folders
+do not exist yet on your system, go ahead and create them. The Library folder
+will already exist but may not be visible in the Finder in Mac OS X Lion (10.7)
+or later. To get to the invisible Library folder, Option-click the Finder's Go
+menu and select the Library menu item that appears.
 
 ### Install the Script
 
@@ -90,7 +92,7 @@ Bugs
 
 Please report any bugs using the GitHub [issue tracker].
 
-  [issue tracker]: https://github.com/jazzhead/safari-resize-window/issues
+  [issue tracker]: https://github.com/jazzhead/resize-window/issues
 
 
 Credits

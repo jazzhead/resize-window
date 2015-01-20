@@ -4,6 +4,14 @@ body {
     margin: 0.5in;  /* ignored by textutil HTML to RTF conversion */
 }
 
+code {
+    color: #888;
+}
+
+pre code {
+    font-size: 12px;
+}
+
 em {
     font-size: 12px;
 }
