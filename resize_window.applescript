@@ -1,5 +1,5 @@
 (*
-Resize Window - Resize front window of any application
+Resize Window - Resize the front window of any application
 
 @version @@VERSION@@
 @date @@RELEASE_DATE@@
@@ -94,7 +94,7 @@ set current_app to get_front_app_name()
 -- Prompt for desired window size
 set m to "Choose a size for " & current_app & "'s front window:"
 repeat -- until a horizontal rule is not selected
-	set size_choice to choose from list size_list default items {size_list's item 8} with title dialog_title with prompt m with multiple selections allowed
+	set size_choice to choose from list size_list default items {size_list's item 8} with title dialog_title with prompt m
 	if size_choice as string is not menu_rule then
 		exit repeat
 	else
@@ -177,7 +177,7 @@ on handle_user_action(size_choice, cur_width, cur_height, current_app)
 		set t to __SCRIPT_NAME__
 		set b to {"License", "Website", "OK"}
 		set m to Â
-			"Resize front window of any application." & return & return Â
+			"Resize the front window of any application." & return & return Â
 			& "Version " & __SCRIPT_VERSION__ & return & return & return & return Â
 			& __SCRIPT_COPYRIGHT__ & return & return Â
 			& __SCRIPT_LICENSE_SUMMARY__ & return
