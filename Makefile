@@ -10,7 +10,7 @@
 # **BEFORE** tagging release, update version number.
 #
 # Version used for distributions (when there is no git repo).
-VERSION       = 0.1.1
+VERSION       = 0.1.2
 
 SHELL         = /bin/sh
 
