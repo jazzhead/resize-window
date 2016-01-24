@@ -6,5 +6,8 @@
 *.scptd
 *.app
 
+# Generated HTML files
+*.html
+
 # Distribution archives
 *.zip
