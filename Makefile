@@ -107,11 +107,13 @@ uninstall:
 	$(call trash-installed,$(INSTDIR)/$(TARGET_AS))
 
 clean:
+	$(eval UNDIRTIED-ARCHIVE = $(subst -dirty,,$(ARCHIVE)))
 	@echo "--->  Deleting build files..."
-	@[ -d "$(BUILD)" ] && $(RM) $(BUILD) || true
-	@[ -f "$(HTML_FILE)" ] && $(RM) $(HTML_FILE) || true
+	@[ -d "$(BUILD)" ] && $(RM) "$(BUILD)" || true
+	@[ -f "$(HTML_FILE)" ] && $(RM) "$(HTML_FILE)" || true
 	@echo "--->  Deleting distribution files..."
-	@[ -d "$(ARCHIVE)" ] && $(RM) $(ARCHIVE) || true
+	@[ -d "$(ARCHIVE)" ] && $(RM) "$(ARCHIVE)" || true
+	@[ -d "$(UNDIRTIED-ARCHIVE)" ] && $(RM) "$(UNDIRTIED-ARCHIVE)" || true
 	@$(RM) $(PACKAGE)-*.zip 2>/dev/null || true
 	@echo "--->  Deletion complete"
 
@@ -119,14 +121,14 @@ doc: $(DOC_TARGET)
 
 dist: all doc
 	@echo "--->  Making a release..."
-	@[ -d "$(ARCHIVE)" ] && $(RM) $(ARCHIVE) || true
-	@[ -f "$(ARCHIVE).zip" ] && $(RM) $(ARCHIVE).zip || true
+	@[ -d "$(ARCHIVE)" ] && $(RM) "$(ARCHIVE)" || true
+	@[ -f "$(ARCHIVE).zip" ] && $(RM) "$(ARCHIVE).zip" || true
 	@$(MKDIR) $(ARCHIVE)
 	@cp -a $(BUILD)/* $(ARCHIVE)
 	@cp -a $(FPO_DIR) $(ARCHIVE)
 	@find $(ARCHIVE) -name .DS_Store -print0 | xargs -0 $(RM)
 	@$(ARCHIVE_CMD) $(ARCHIVE) $(ARCHIVE).zip
-	@$(RM) $(ARCHIVE)
+	@$(RM) "$(ARCHIVE)"
 	@echo "--->  Release distribution archive created"
 
 
