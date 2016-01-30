@@ -81,7 +81,7 @@ Resize Window was written by [Steve Wheeler](http://swheeler.com/).
 License
 -------
 
-Copyright &copy; 2014--2015 Steve Wheeler.
+Copyright &copy; 2014--2016 Steve Wheeler.
 
 This program is free software available under the terms of a BSD-style
 (3-clause) open source license. See the [LICENSE] file for details.

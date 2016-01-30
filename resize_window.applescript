@@ -10,7 +10,7 @@ This program is free software available under the terms of a BSD-style
 *)
 
 (*
-Copyright (c) 2014-2015 Steve Wheeler
+Copyright (c) 2014-2016 Steve Wheeler
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 property __SCRIPT_NAME__ : "Resize Window"
 property __SCRIPT_VERSION__ : "@@VERSION@@"
 property __SCRIPT_AUTHOR__ : "Steve Wheeler"
-property __SCRIPT_COPYRIGHT__ : "Copyright © 2014Ð2015 " & __SCRIPT_AUTHOR__
+property __SCRIPT_COPYRIGHT__ : "Copyright © 2014Ð2016 " & __SCRIPT_AUTHOR__
 property __SCRIPT_WEBSITE__ : "http://jazzheaddesign.com/work/code/resize-window/"
 property __SCRIPT_LICENSE_SUMMARY__ : "This program is free software available under the terms of a BSD-style (3-clause) open source license. Click the \"License\" button or see the README file included with the distribution for details."
 property __SCRIPT_LICENSE__ : __SCRIPT_COPYRIGHT__ & return & "All rights reserved.
@@ -112,7 +112,7 @@ tell application current_app
 end tell
 
 -- Handle user choice
-set size_choice to handle_user_action(size_choice, cur_width, cur_height, current_app)
+set size_choice to handle_user_action(size_choice, cur_width, cur_height, current_app, {win_left, win_top, win_right, win_bottom})
 if size_choice is false then return
 
 -- Parse and validate size choice
@@ -172,7 +172,8 @@ on get_front_app_name()
 	return current_app
 end get_front_app_name
 
-on handle_user_action(size_choice, cur_width, cur_height, current_app)
+on handle_user_action(size_choice, cur_width, cur_height, current_app, win_bounds)
+	set {win_left, win_top, win_right, win_bottom} to win_bounds
 	if size_choice is size_list's last item then
 		set t to __SCRIPT_NAME__
 		set b to {"License", "Website", "OK"}
