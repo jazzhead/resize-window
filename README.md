@@ -75,7 +75,7 @@ Please report any bugs using the GitHub [issue tracker].
 Credits
 -------
 
-Resize Window was written by [Steve Wheeler](http://swheeler.com/).
+Resize Window was written by [Steve Wheeler](http://www.swheeler.com/).
 
 
 License
