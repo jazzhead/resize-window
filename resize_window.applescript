@@ -64,7 +64,7 @@ global dialog_title, size_adjustment_list, custom_choice, size_list, mac_menu_ba
 set dialog_title to __SCRIPT_NAME__
 set size_adjustment_list to {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
 set custom_choice to "Custom size…"
-set mac_menu_bar to 22
+set mac_menu_bar to 23 -- 22px menu plus 1px bottom border
 
 set u_dash to «data utxt2500» as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 set menu_rule to my multiply_text(u_dash, 21)
