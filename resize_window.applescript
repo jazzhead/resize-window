@@ -69,12 +69,12 @@ set mac_menu_bar to 23 -- 22px menu plus 1px bottom border
 set u_dash to Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 set menu_rule to my multiply_text(u_dash, 21)
 
-set size_list to paragraphs of "320x480	iPhone Portrait (640x960)
-480x320	iPhone Landscape (960x640)
-320x568	iPhone 5 Portrait (640x1136)
-568x320	iPhone 5 Landscape (1136x640)
-640x480	VGA (4:3)
-800x600	SVGA (4:3)
+set size_list to paragraphs of "320x480		iPhone Portrait (640x960)
+480x320		iPhone Landscape (960x640)
+320x568		iPhone 5 Portrait (640x1136)
+568x320		iPhone 5 Landscape (1136x640)
+640x480		VGA (4:3)
+800x600		SVGA (4:3)
 768x1024	iPad Portrait
 1024x768	XGA (4:3), iPad Landscape
 1280x800	WXGA (16:10)
