@@ -59,15 +59,16 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AN
 
 (* ==== Initializations ==== *)
 
-global dialog_title, size_adjustment_list, custom_choice, size_list, mac_menu_bar
+global dialog_title, width_increments, height_increments, custom_choice, size_list, mac_menu_bar
 
 set dialog_title to __SCRIPT_NAME__
-set size_adjustment_list to {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
 set custom_choice to "Custom sizeÉ"
 set mac_menu_bar to 23 -- 22px menu plus 1px bottom border
-
 set u_dash to Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 set menu_rule to my multiply_text(u_dash, 21)
+
+set width_increments to {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
+set height_increments to {"Height + 1px", "Height - 1px", "Height + 10px", "Height - 10px"}
 
 set mobile_sizes to paragraphs of "320x480		iPhone 4 Ñ Portrait (2x)
 480x320		iPhone 4 Ñ Landscape (2x)
@@ -90,7 +91,10 @@ set size_list to mobile_sizes & Â
 	menu_rule & Â
 	desktop_sizes & Â
 	menu_rule & Â
-	size_adjustment_list & Â
+	width_increments & Â
+	menu_rule & Â
+	height_increments & Â
+	menu_rule & Â
 	custom_choice & Â
 	menu_rule & Â
 	"Show front window size" & Â
@@ -208,18 +212,14 @@ on handle_user_action(size_choice, cur_width, cur_height, current_app, win_bound
 		set m to "Type in a custom width and height separated by an \"x\":"
 		display dialog m with title dialog_title default answer "1024x768"
 		set size_choice to text returned of result
-	else if size_choice is in size_adjustment_list then
-		-- Currently we're only adjusting the width, so no need for specific variables
-		if size_choice is size_adjustment_list's item 1 then
-			set size_adjustment to 1
-		else if size_choice is size_adjustment_list's item 2 then
-			set size_adjustment to -1
-		else if size_choice is size_adjustment_list's item 3 then
-			set size_adjustment to 10
+	else if size_choice is in width_increments & height_increments then
+		set {width_or_height, int_sign, int_amount} to split_text(characters 1 thru -3 of size_choice as string, space)
+		set size_adjustment to int_sign & int_amount as integer
+		if width_or_height is "Width" then
+			set win_right to win_right + size_adjustment
 		else
-			set size_adjustment to -10
+			set win_bottom to win_bottom + size_adjustment
 		end if
-		set win_right to win_right + size_adjustment
 		tell application current_app to set bounds of window 1 to {win_left, win_top, win_right, win_bottom}
 		return false
 	end if
