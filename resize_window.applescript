@@ -133,7 +133,7 @@ if size_choice is false then return
 set {new_width, new_height} to validate_window_size(size_choice)
 
 -- Check for size adjustments
-set {is_width_only, should_subtract_mac_menu} to which_dimensions()
+set {is_width_only, should_subtract_mac_menu} to which_dimensions(new_width, new_height)
 
 
 -- Calculate new window size
@@ -250,9 +250,9 @@ on validate_window_size(size_choice)
 	return {new_width, new_height}
 end validate_window_size
 
-on which_dimensions()
+on which_dimensions(new_width, new_height)
 	local dimension_choice, m, b
-	set m to "Resize both the window's width and height or just the width?"
+	set m to "Resize both the window's width and height (" & new_width & "x" & new_height & ") or just the width (" & new_width & ")?"
 	set b to {"Cancel", "Width & Height", "Width-only"}
 	display dialog m with title dialog_title buttons b default button 3
 	set dimension_choice to button returned of result
