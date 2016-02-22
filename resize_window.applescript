@@ -69,16 +69,26 @@ set mac_menu_bar to 23 -- 22px menu plus 1px bottom border
 set u_dash to Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 set menu_rule to my multiply_text(u_dash, 21)
 
-set size_list to paragraphs of "320x480		iPhone Portrait (640x960)
-480x320		iPhone Landscape (960x640)
-320x568		iPhone 5 Portrait (640x1136)
-568x320		iPhone 5 Landscape (1136x640)
-640x480		VGA (4:3)
+set mobile_sizes to paragraphs of "320x480		iPhone 4 Ñ Portrait (2x)
+480x320		iPhone 4 Ñ Landscape (2x)
+320x568		iPhone 5 Ñ Portrait (2x)
+568x320		iPhone 5 Ñ Landscape (2x)
+375x667		iPhone 6 Ñ Portrait (2x)
+667x375		iPhone 6 Ñ Landscape (2x)
+414x736		iPhone 6 Plus Ñ Portrait (3x)
+736x414		iPhone 6 Plus Ñ Landscape (3x)
+768x1024	iPad Ñ Portrait (2x)
+1024x768	iPad Ñ Landscape (2x)"
+
+set desktop_sizes to paragraphs of "640x480		VGA (4:3)
 800x600		SVGA (4:3)
-768x1024	iPad Portrait
-1024x768	XGA (4:3), iPad Landscape
+1024x768	XGA (4:3)
 1280x800	WXGA (16:10)
-1366x768	WXGA (16:9)" & Â
+1366x768	WXGA (16:9)"
+
+set size_list to mobile_sizes & Â
+	menu_rule & Â
+	desktop_sizes & Â
 	menu_rule & Â
 	size_adjustment_list & Â
 	custom_choice & Â
@@ -94,7 +104,7 @@ set current_app to get_front_app_name()
 -- Prompt for desired window size
 set m to "Choose a size for " & current_app & "'s front window:"
 repeat -- until a horizontal rule is not selected
-	set size_choice to choose from list size_list default items {size_list's item 8} with title dialog_title with prompt m
+	set size_choice to choose from list size_list default items {size_list's item 14} with title dialog_title with prompt m
 	if size_choice as string is not menu_rule then
 		exit repeat
 	else
