@@ -97,7 +97,6 @@ set size_list to mobile_sizes & Â
 	menu_rule & Â
 	custom_choice & Â
 	menu_rule & Â
-	"Show front window size" & Â
 	("About " & __SCRIPT_NAME__)
 
 
@@ -105,8 +104,15 @@ set size_list to mobile_sizes & Â
 
 set current_app to get_front_app_name()
 
+-- Get current window size
+tell application current_app
+	set {win_left, win_top, win_right, win_bottom} to bounds of window 1
+	set cur_width to win_right - win_left
+	set cur_height to win_bottom - win_top
+end tell
+
 -- Prompt for desired window size
-set m to "Choose a size for " & current_app & "'s front window:"
+set m to "Choose a size for " & current_app & "'s front window" & return & "(currently " & cur_width & "x" & cur_height & "):"
 repeat -- until a horizontal rule is not selected
 	set size_choice to choose from list size_list default items {size_list's item 14} with title dialog_title with prompt m
 	if size_choice as string is not menu_rule then
@@ -118,12 +124,6 @@ end repeat
 if size_choice is false then error number -128 -- User canceled
 set size_choice to size_choice as string
 
--- Get current window size
-tell application current_app
-	set {win_left, win_top, win_right, win_bottom} to bounds of window 1
-	set cur_width to win_right - win_left
-	set cur_height to win_bottom - win_top
-end tell
 
 -- Handle user choice
 set size_choice to handle_user_action(size_choice, cur_width, cur_height, current_app, {win_left, win_top, win_right, win_bottom})
@@ -203,10 +203,6 @@ on handle_user_action(size_choice, cur_width, cur_height, current_app, win_bound
 		else if btn_choice is b's item 2 then
 			open location __SCRIPT_WEBSITE__
 		end if
-		return false
-	else if size_choice is size_list's item -2 then
-		set m to cur_width & "x" & cur_height as text
-		display alert current_app & " front window size" message m buttons {"OK"} default button 1
 		return false
 	else if size_choice is custom_choice then
 		set m to "Type in a custom width and height separated by an \"x\":"
