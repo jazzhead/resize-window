@@ -22,13 +22,12 @@ websites that adapt to different sizes.
 Features
 --------
 
-* Select from a list of common browser window sizes.
-* Increment the width plus or minus 1 pixel or 10 pixels.
+* Select from a list of common web browser window sizes.
+* Increment the width or height plus or minus 1 pixel or 10 pixels.
 * Type in a custom width and height.
 * Choose to adjust only the width or both the width and the height.
 * When adjusting the height, choose whether or not to subtract the OS X menu
   bar height.
-* Display the current window size.
 
 <!--
 The following horizontal rule is a kludge to get a paragraph space in the RTF
@@ -81,8 +80,8 @@ to easily find it if you need it.
 If you're not already using a third-party script runner, enable Apple's Script
 menu. The procedure for enabling the menu is different depending on which
 version of Mac OS X you're running. For Snow Leopard (10.6) and later, it is a
-preference setting in the AppleScript Editor app called "Show Script menu in
-menu bar":
+preference setting in the Script Editor app called "Show Script menu in menu
+bar":
 
   ![Script menu setting](img/scriptmenu-s.png "Screenshot of Script menu setting")
 
