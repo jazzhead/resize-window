@@ -45,10 +45,10 @@ Installation
 To compile and install the script, `cd` into the directory containing the
 source code and run:
 
-~~~ bash
+```bash
 $ make
 $ make install
-~~~
+```
 
 That uses `osacompile` to create a compiled AppleScript named "Resize
 Window.scpt" from the source file and installs it in a
