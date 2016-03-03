@@ -66,8 +66,15 @@ end run
 on make_controller() --> Controller
 	script
 		on run
-			set app_window to make_app_window(get_front_app_name()) --> Model
-			app_window's init()
+			tell my AppFactory
+				-- Register apps that support resizing by window content area dimensions.
+				register_product(make_safari_window())
+				register_product(make_chrome_window())
+				register_product(make_firefox_window())
+				register_product(make_webkit_window())
+			end tell
+			
+			set app_window to my AppFactory's make_window(get_front_app_name()) --> Model
 			
 			set ui_view to make_ui_view(app_window) --> View
 			tell ui_view
@@ -85,10 +92,10 @@ on make_controller() --> Controller
 	end script
 end make_controller
 
-on make_app_window(app_name) --> Model
+on make_app_window() --> Model
 	script
-		property class : "AppWindow"
-		property _app_name : app_name -- string
+		property class : "AppWindow" -- superclass
+		property _app_name : missing value -- string
 		property _mac_menu_bar : 23 -- int (22px menu plus 1px bottom border)
 		
 		property _width : missing value -- int
@@ -102,8 +109,10 @@ on make_app_window(app_name) --> Model
 		property _new_height : missing value -- int
 		property _is_width_only : missing value -- boolean
 		property _should_subtract_mac_menu : missing value -- boolean
+		property _is_mobile : missing value -- boolean
 		
-		on init() --> void
+		on init(app_name) --> void
+			set _app_name to app_name
 			tell application _app_name
 				set {_left, _top, _right, _bottom} to bounds of window 1
 				set _width to _right - _left
@@ -157,6 +166,10 @@ on make_app_window(app_name) --> Model
 		
 		(* == Setters == *)
 		
+		on set_mobile(true_or_false) --> void
+			set _is_mobile to true_or_false
+		end set_mobile
+		
 		on set_right(val) --> void
 			set _right to val
 		end set_right
@@ -182,6 +195,10 @@ on make_app_window(app_name) --> Model
 		end set_subtract_mac_menu
 		
 		(* == Getters == *)
+		
+		on is_mobile() --> boolean
+			return _is_mobile
+		end is_mobile
 		
 		on is_width_only() --> boolean
 			return _is_width_only
@@ -275,6 +292,15 @@ on make_ui_view(app_window) --> View
 			if _size_choice is false then error number -128 -- User canceled
 			set _size_choice to _size_choice as string
 			
+			-- Only supported apps can target the window body for mobile sizes.
+			-- Those supported apps will have a different class name than the
+			-- generic fallback "AppWindow".
+			if _app_window's class is not "AppWindow" and _size_choice is in _mobile_sizes then
+				_app_window's set_mobile(true)
+			else
+				_app_window's set_mobile(false)
+			end if
+			
 			_handle_user_action()
 		end create_view
 		
@@ -283,26 +309,26 @@ on make_ui_view(app_window) --> View
 		end get_size_choice
 		
 		on which_dimensions() --> void
-			local this_choice, m, b
+			local dimension_choice, mac_menu_choice, m, b
 			tell _app_window
 				set m to "Resize both the window's width and height (" & get_new_width() & "x" & get_new_height() & ") or just the width (" & get_new_width() & ")?"
 			end tell
 			set b to {"Cancel", "Width & Height", "Width-only"}
 			display dialog m with title _dialog_title buttons b default button 3
-			set this_choice to button returned of result
-			if this_choice is b's item 3 then
+			set dimension_choice to button returned of result
+			if dimension_choice is b's item 3 then
 				_app_window's set_width_only(true)
 			else
 				_app_window's set_width_only(false)
 			end if
 			
 			_app_window's set_subtract_mac_menu(false)
-			if not _app_window's is_width_only() then
+			if not _app_window's is_width_only() and not _app_window's is_mobile() then
 				set m to "Subtract Mac Menu Bar height (" & _app_window's get_mac_menu_bar() & "px)?"
 				set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
 				display dialog m with title _dialog_title buttons b default button 3
-				set this_choice to button returned of result
-				if this_choice is b's item 2 then
+				set mac_menu_choice to button returned of result
+				if mac_menu_choice is b's item 2 then
 					_app_window's set_subtract_mac_menu(true)
 				end if
 			end if
@@ -346,6 +372,139 @@ on make_ui_view(app_window) --> View
 	end script
 end make_ui_view
 
+(* ==== Factory Pattern ==== *)
+
+script AppFactory
+	property class : "AppFactory" -- Factory
+	property _registered_products : {} -- array (concrete products)
+	
+	on register_product(this_product) --> void
+		set end of _registered_products to this_product
+	end register_product
+	
+	on make_window(app_name) --> AppWindow
+		repeat with this_product in _registered_products
+			if app_name is this_product's to_string() then
+				this_product's init(app_name)
+				return this_product
+			end if
+		end repeat
+		-- fallback to generic app window w/o inner dimension support
+		set this_app to make_app_window() --> AppWindow superclass (Model)
+		this_app's init(app_name)
+		return this_app
+	end make_window
+end script
+
+on make_supported_app()
+	script
+		property class : "SupportedApp" -- abstract product
+		property parent : make_app_window() -- extends AppWindow (Model)
+		on to_string() --> string
+			return my short_name
+		end to_string
+	end script
+end make_supported_app
+
+on make_safari_window()
+	script
+		property class : "SafariWindow" -- concrete product
+		property parent : make_supported_app() -- extends SupportedApp
+		property short_name : "Safari"
+		
+		on calculate_size()
+			continue calculate_size() -- call superclass's method first
+			-- Resize mobile sizes by the window content area instead of the window bounds
+			if my _is_mobile then
+				gui_scripting_status() -- requires GUI scripting
+				tell application "System Events" to tell application process (my _app_name)
+					tell window 1's tab group 1's group 1's group 1's scroll area 1
+						set h_adj to (attribute "AXSize"'s value as list)'s last item
+					end tell
+				end tell
+				my adjust_bottom((my _height) - h_adj)
+			end if
+		end calculate_size
+	end script
+end make_safari_window
+
+on make_webkit_window()
+	script
+		property class : "WebKitWindow" -- concrete product
+		property parent : make_safari_window() -- extends SafariWindow
+		property short_name : "WebKit"
+	end script
+end make_webkit_window
+
+on make_chrome_window()
+	script
+		property class : "ChromeWindow" -- concrete product
+		property parent : make_supported_app() -- extends SupportedApp
+		property short_name : "Chrome"
+		
+		on calculate_size()
+			continue calculate_size() -- call superclass's method first
+			-- Resize mobile sizes by the window content area instead of the window bounds
+			if my _is_mobile then
+				gui_scripting_status() -- requires GUI scripting
+				set h_adj to 0
+				tell application "System Events" to tell application process (my _app_name)
+					tell window 1
+						try
+							set h_adj to h_adj + ((toolbar 1's attribute "AXSize"'s value as list)'s last item)
+						end try
+						try
+							set h_adj to h_adj + ((tab group 1's attribute "AXSize"'s value as list)'s last item)
+						end try
+					end tell
+				end tell
+				my adjust_bottom(h_adj)
+			end if
+		end calculate_size
+	end script
+end make_chrome_window
+
+on make_firefox_window()
+	script
+		property class : "FirefoxWindow" -- concrete product
+		property parent : make_supported_app() -- extends SupportedApp
+		property short_name : "Firefox"
+		
+		on calculate_size()
+			continue calculate_size() -- call superclass's method first
+			-- Resize mobile sizes by the window content area instead of the window bounds.
+			if my _is_mobile then
+				-- XXX: Firefox doesn't provide access to the window content
+				-- area dimensions so just use a best-guess hardcoded value
+				-- (which could become outdated with app updates or if other
+				-- toolbars are installed or hidden).
+				my adjust_bottom(102) -- tab bar + bookmarks toolbar
+			end if
+		end calculate_size
+	end script
+end make_firefox_window
+
+-- Just an example. It works, but it's not necessary, so don't register it with the factory in the final script.
+(*on make_textedit_window()
+	script
+		property class : "TextEditWindow" -- concrete product
+		property parent : make_supported_app() -- extends SupportedApp
+		property short_name : "TextEdit"
+		
+		on calculate_size()
+			continue calculate_size() -- call superclass's method first
+			if my _is_mobile then
+				gui_scripting_status() -- requires GUI scripting
+				tell application "System Events" to tell application process (my _app_name)
+					tell window 1's scroll area 1's text area 1
+						set h_adj to (attribute "AXSize"'s value as list)'s last item
+					end tell
+				end tell
+				my adjust_bottom((my _height) - h_adj)
+			end if
+		end calculate_size
+	end script
+end make_textedit_window*)
 
 (* ==== Utility Functions (Global) ==== *)
 
@@ -400,3 +559,55 @@ on split_text(txt, delim) --> array
 		error "Can't split_text: " & err_msg number err_num
 	end try
 end split_text
+
+on gui_scripting_status()
+	local os_ver, is_before_mavericks, ui_enabled, apple_accessibility_article
+	local err_msg, err_num, msg, t, b
+	
+	set os_ver to system version of (system info)
+	
+	considering numeric strings -- version strings
+		set is_before_mavericks to os_ver < "10.9"
+	end considering
+	
+	if is_before_mavericks then -- things changed in Mavericks (10.9)
+		-- check to see if assistive devices is enabled
+		tell application "System Events"
+			set ui_enabled to UI elements enabled
+		end tell
+		if ui_enabled is false then
+			tell application "System Preferences"
+				activate
+				set current pane to pane id "com.apple.preference.universalaccess"
+				display dialog "This script utilizes the built-in Graphic User Interface Scripting architecture of Mac OS X which is currently disabled." & return & return & "You can activate GUI Scripting by selecting the checkbox \"Enable access for assistive devices\" in the Accessibility preference pane." with icon 1 buttons {"Cancel"} default button 1
+			end tell
+		end if
+	else
+		-- In Mavericks (10.9) and later, the system should prompt the user with
+		-- instructions on granting accessibility access, so try to trigger that.
+		try
+			tell application "System Events"
+				tell (first process whose frontmost is true)
+					set frontmost to true
+					tell window 1
+						UI elements
+					end tell
+				end tell
+			end tell
+		on error err_msg number err_num
+			-- In some cases, the system prompt doesn't appear, so always give some info.
+			set msg to "Error: " & err_msg & " (" & err_num & ")"
+			if err_num is -1719 then
+				set apple_accessibility_article to "http://support.apple.com/en-us/HT202802"
+				set t to "GUI Scripting needs to be activated"
+				set msg to msg & return & return & "This script utilizes the built-in Graphic User Interface Scripting architecture of Mac OS X which is currently disabled." & return & return & "If the system doesn't prompt you with instructions for how to enable GUI scripting access, then see Apple's article at: " & return & apple_accessibility_article
+				set b to {"Go to Apple's Webpage", "Cancel"}
+				display alert t message msg buttons b default button 2
+				if button returned of result is b's item 1 then
+					tell me to open location apple_accessibility_article
+				end if
+				error number -128 --> User canceled
+			end if
+		end try
+	end if
+end gui_scripting_status
