@@ -418,9 +418,36 @@ on make_supported_app() --> abstract product
 	script
 		property class : "SupportedApp"
 		property parent : make_app_window() -- extends AppWindow (Model)
+		
 		on to_string() --> string
 			return my short_name
 		end to_string
+		
+		on reset_gui(app_process)
+			using terms from application "System Events"
+				tell app_process
+					-- XXX: Release any keys that may have been used to invoke
+					-- the script.
+					--
+					-- This one caused problems with Safari (in Yosemite, at
+					-- least) when invoking the script with a keyboard shortcut
+					-- using FastScripts. The control key causes a "Display a
+					-- menu" pop-up label thingie to appear in the Safari
+					-- window which apparently prevents UI scripting from
+					-- accessing the targeted UI elements. When the script is
+					-- run from Script Editor or by selecting the script from
+					-- the FastScript menu instead of with a keyboard shortcut,
+					-- the UI scripting works fine because no keys are down
+					-- to interfere with UI scripting.
+					key up control
+					-- Might as well preemptively release these (untested) keys
+					-- as well while I'm at it, just in case.
+					key up command
+					key up option
+					key up shift
+				end tell
+			end using terms from
+		end reset_gui
 	end script
 end make_supported_app
 
@@ -435,12 +462,22 @@ on make_safari_window() --> concrete product
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my _is_mobile then
 				my Util's gui_scripting_status() -- requires GUI scripting
-				tell application "System Events" to tell application process (my _app_name)
-					tell window 1's tab group 1's group 1's group 1's scroll area 1
-						set h_adj to (attribute "AXSize"'s value as list)'s last item
-					end tell
-				end tell
-				my adjust_bottom((my _height) - h_adj)
+				set h_adj to 0
+				repeat 10 times -- until hopefully GUI scripting succeeds
+					try
+						tell application "System Events" to tell application process (my _app_name)
+							set frontmost to true
+							my reset_gui(it)
+							tell window 1's tab group 1's group 1's group 1's scroll area 1
+								set h_adj to (attribute "AXSize"'s value as list)'s last item
+							end tell
+						end tell
+						exit repeat
+					on error
+						delay 0.1 -- give the UI time to catch up
+					end try
+				end repeat
+				if h_adj > 0 then my adjust_bottom((my _height) - h_adj)
 			end if
 		end calculate_size
 	end script
@@ -467,6 +504,8 @@ on make_chrome_window() --> concrete product
 				my Util's gui_scripting_status() -- requires GUI scripting
 				set h_adj to 0
 				tell application "System Events" to tell application process (my _app_name)
+					set frontmost to true
+					my reset_gui(it)
 					tell window 1
 						try
 							set h_adj to h_adj + ((toolbar 1's attribute "AXSize"'s value as list)'s last item)
@@ -476,7 +515,7 @@ on make_chrome_window() --> concrete product
 						end try
 					end tell
 				end tell
-				my adjust_bottom(h_adj)
+				if h_adj > 0 then my adjust_bottom(h_adj)
 			end if
 		end calculate_size
 	end script
