@@ -57,7 +57,25 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
 
-on run
+(********** Code Overview
+	$ egrep "^(on|script|\(\* ====)" resize_window.applescript
+	on run -- main
+	(* ==== MVC Classes ==== *)
+	on make_controller() --> Controller
+	on make_app_window() --> Model
+	on make_ui(app_window) --> View
+	(* ==== Factory Pattern ==== *)
+	script AppFactory -- Factory
+	on make_supported_app() --> abstract product
+	on make_safari_window() --> concrete product
+	on make_webkit_window() --> concrete product
+	on make_chrome_window() --> concrete product
+	on make_firefox_window() --> concrete product
+	(* ==== Miscellaneous Classes ==== *)
+	script Util -- Utility Functions
+********************)
+
+on run -- main
 	run make_controller() --> Controller
 end run
 
@@ -74,9 +92,9 @@ on make_controller() --> Controller
 				register_product(make_webkit_window())
 			end tell
 			
-			set app_window to my AppFactory's make_window(get_front_app_name()) --> Model
+			set app_window to my AppFactory's make_window(my Util's get_front_app_name()) --> Model
 			
-			set ui_view to make_ui_view(app_window) --> View
+			set ui_view to make_ui(app_window) --> View
 			tell ui_view
 				create_view()
 				if get_size_choice() is false then return -- no (more) adjustments
@@ -132,16 +150,16 @@ on make_app_window() --> Model
 			set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
 			
 			try
-				set size_choice to split_text(size_choice, tab)'s first item
-				set {_new_width, _new_height} to split_text(size_choice, "x")
+				set size_choice to my Util's split_text(size_choice, tab)'s first item
+				set {_new_width, _new_height} to my Util's split_text(size_choice, "x")
 			on error
 				set txt to "Invalid window size"
-				error_with_alert(txt, msg)
+				my Util's error_with_alert(txt, msg)
 			end try
 			
 			if _new_width is "" or _new_height is "" then
 				set txt to "Invalid width and/or height"
-				error_with_alert(txt, msg)
+				my Util's error_with_alert(txt, msg)
 			end if
 			
 			try
@@ -150,7 +168,7 @@ on make_app_window() --> Model
 			on error
 				set txt to "Invalid width and/or height"
 				set msg to "Width and height must be integers."
-				error_with_alert(txt, msg)
+				my Util's error_with_alert(txt, msg)
 			end try
 		end validate_window_size
 		
@@ -230,7 +248,7 @@ on make_app_window() --> Model
 	end script
 end make_app_window
 
-on make_ui_view(app_window) --> View
+on make_ui(app_window) --> View
 	script
 		property _app_window : app_window -- Model
 		property _size_choice : missing value -- string
@@ -240,7 +258,7 @@ on make_ui_view(app_window) --> View
 		property _dialog_title : __SCRIPT_NAME__
 		property _custom_choice : "Custom sizeÉ"
 		property _u_dash : Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
-		property _menu_rule : my multiply_text(_u_dash, 21)
+		property _menu_rule : my Util's multiply_text(_u_dash, 21)
 		
 		property _width_increments : {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
 		property _height_increments : {"Height + 1px", "Height - 1px", "Height + 10px", "Height - 10px"}
@@ -358,7 +376,7 @@ on make_ui_view(app_window) --> View
 				display dialog m with title _dialog_title default answer "1024x768"
 				set _size_choice to text returned of result
 			else if _size_choice is in _width_increments & _height_increments then
-				set {width_or_height, _sign, _amount} to split_text(characters 1 thru -3 of _size_choice as string, space)
+				set {width_or_height, _sign, _amount} to my Util's split_text(characters 1 thru -3 of _size_choice as string, space)
 				set size_adjustment to _sign & _amount as integer
 				if width_or_height is "Width" then
 					_app_window's adjust_right(size_adjustment)
@@ -370,12 +388,12 @@ on make_ui_view(app_window) --> View
 			end if
 		end _handle_user_action
 	end script
-end make_ui_view
+end make_ui
 
 (* ==== Factory Pattern ==== *)
 
-script AppFactory
-	property class : "AppFactory" -- Factory
+script AppFactory -- Factory
+	property class : "AppFactory"
 	property _registered_products : {} -- array (concrete products)
 	
 	on register_product(this_product) --> void
@@ -396,9 +414,9 @@ script AppFactory
 	end make_window
 end script
 
-on make_supported_app()
+on make_supported_app() --> abstract product
 	script
-		property class : "SupportedApp" -- abstract product
+		property class : "SupportedApp"
 		property parent : make_app_window() -- extends AppWindow (Model)
 		on to_string() --> string
 			return my short_name
@@ -406,9 +424,9 @@ on make_supported_app()
 	end script
 end make_supported_app
 
-on make_safari_window()
+on make_safari_window() --> concrete product
 	script
-		property class : "SafariWindow" -- concrete product
+		property class : "SafariWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Safari"
 		
@@ -416,7 +434,7 @@ on make_safari_window()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my _is_mobile then
-				gui_scripting_status() -- requires GUI scripting
+				my Util's gui_scripting_status() -- requires GUI scripting
 				tell application "System Events" to tell application process (my _app_name)
 					tell window 1's tab group 1's group 1's group 1's scroll area 1
 						set h_adj to (attribute "AXSize"'s value as list)'s last item
@@ -428,17 +446,17 @@ on make_safari_window()
 	end script
 end make_safari_window
 
-on make_webkit_window()
+on make_webkit_window() --> concrete product
 	script
-		property class : "WebKitWindow" -- concrete product
+		property class : "WebKitWindow"
 		property parent : make_safari_window() -- extends SafariWindow
 		property short_name : "WebKit"
 	end script
 end make_webkit_window
 
-on make_chrome_window()
+on make_chrome_window() --> concrete product
 	script
-		property class : "ChromeWindow" -- concrete product
+		property class : "ChromeWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Chrome"
 		
@@ -446,7 +464,7 @@ on make_chrome_window()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my _is_mobile then
-				gui_scripting_status() -- requires GUI scripting
+				my Util's gui_scripting_status() -- requires GUI scripting
 				set h_adj to 0
 				tell application "System Events" to tell application process (my _app_name)
 					tell window 1
@@ -464,9 +482,9 @@ on make_chrome_window()
 	end script
 end make_chrome_window
 
-on make_firefox_window()
+on make_firefox_window() --> concrete product
 	script
-		property class : "FirefoxWindow" -- concrete product
+		property class : "FirefoxWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Firefox"
 		
@@ -485,16 +503,16 @@ on make_firefox_window()
 end make_firefox_window
 
 -- Just an example. It works, but it's not necessary, so don't register it with the factory in the final script.
-(*on make_textedit_window()
+(*on make_textedit_window() --> concrete product
 	script
-		property class : "TextEditWindow" -- concrete product
+		property class : "TextEditWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "TextEdit"
 		
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			if my _is_mobile then
-				gui_scripting_status() -- requires GUI scripting
+				my Util's gui_scripting_status() -- requires GUI scripting
 				tell application "System Events" to tell application process (my _app_name)
 					tell window 1's scroll area 1's text area 1
 						set h_adj to (attribute "AXSize"'s value as list)'s last item
@@ -506,108 +524,111 @@ end make_firefox_window
 	end script
 end make_textedit_window*)
 
-(* ==== Utility Functions (Global) ==== *)
 
-on get_front_app_name() --> string
-	tell application "System Events"
-		
-		-- Ignore (Apple)Script Editor and Terminal when getting the front app
-		-- name since most of the time they will just be used during
-		-- development and testing to run the script.
-		repeat 10 times -- limit repetitions just in case
-			set frontmost_process to first process where it is frontmost
-			if short name of frontmost_process is in {"Script Editor", "AppleScript Editor", "Terminal"} then
-				set original_process to frontmost_process
-				set visible of original_process to false
-				repeat while (original_process is frontmost)
-					delay 0.2
-				end repeat
-			else
-				exit repeat
-			end if
-		end repeat
-		set current_app to short name of frontmost_process
-		try -- if we hid a process
-			set frontmost of original_process to true -- return orginal app to front
-		end try
-	end tell
-	return current_app
-end get_front_app_name
+(* ==== Miscellaneous Classes ==== *)
 
-on error_with_alert(txt, msg) --> void
-	display alert txt message msg as critical buttons {"Cancel"} default button 1
-	error number -128 -- User canceled
-end error_with_alert
-
-on multiply_text(str, n) --> string
-	if n < 1 or str = "" then return ""
-	set lst to {}
-	repeat n times
-		set end of lst to str
-	end repeat
-	return lst as string
-end multiply_text
-
-on split_text(txt, delim) --> array
-	try
-		set AppleScript's text item delimiters to (delim as string)
-		set lst to every text item of (txt as string)
-		set AppleScript's text item delimiters to ""
-		return lst
-	on error err_msg number err_num
-		set AppleScript's text item delimiters to ""
-		error "Can't split_text: " & err_msg number err_num
-	end try
-end split_text
-
-on gui_scripting_status()
-	local os_ver, is_before_mavericks, ui_enabled, apple_accessibility_article
-	local err_msg, err_num, msg, t, b
-	
-	set os_ver to system version of (system info)
-	
-	considering numeric strings -- version strings
-		set is_before_mavericks to os_ver < "10.9"
-	end considering
-	
-	if is_before_mavericks then -- things changed in Mavericks (10.9)
-		-- check to see if assistive devices is enabled
+script Util -- Utility Functions
+	on get_front_app_name() --> string
 		tell application "System Events"
-			set ui_enabled to UI elements enabled
+			
+			-- Ignore (Apple)Script Editor and Terminal when getting the front app
+			-- name since most of the time they will just be used during
+			-- development and testing to run the script.
+			repeat 10 times -- limit repetitions just in case
+				set frontmost_process to first process where it is frontmost
+				if short name of frontmost_process is in {"Script Editor", "AppleScript Editor", "Terminal"} then
+					set original_process to frontmost_process
+					set visible of original_process to false
+					repeat while (original_process is frontmost)
+						delay 0.2
+					end repeat
+				else
+					exit repeat
+				end if
+			end repeat
+			set current_app to short name of frontmost_process
+			try -- if we hid a process
+				set frontmost of original_process to true -- return orginal app to front
+			end try
 		end tell
-		if ui_enabled is false then
-			tell application "System Preferences"
-				activate
-				set current pane to pane id "com.apple.preference.universalaccess"
-				display dialog "This script utilizes the built-in Graphic User Interface Scripting architecture of Mac OS X which is currently disabled." & return & return & "You can activate GUI Scripting by selecting the checkbox \"Enable access for assistive devices\" in the Accessibility preference pane." with icon 1 buttons {"Cancel"} default button 1
-			end tell
-		end if
-	else
-		-- In Mavericks (10.9) and later, the system should prompt the user with
-		-- instructions on granting accessibility access, so try to trigger that.
+		return current_app
+	end get_front_app_name
+	
+	on error_with_alert(txt, msg) --> void
+		display alert txt message msg as critical buttons {"Cancel"} default button 1
+		error number -128 -- User canceled
+	end error_with_alert
+	
+	on multiply_text(str, n) --> string
+		if n < 1 or str = "" then return ""
+		set lst to {}
+		repeat n times
+			set end of lst to str
+		end repeat
+		return lst as string
+	end multiply_text
+	
+	on split_text(txt, delim) --> array
 		try
+			set AppleScript's text item delimiters to (delim as string)
+			set lst to every text item of (txt as string)
+			set AppleScript's text item delimiters to ""
+			return lst
+		on error err_msg number err_num
+			set AppleScript's text item delimiters to ""
+			error "Can't split_text: " & err_msg number err_num
+		end try
+	end split_text
+	
+	on gui_scripting_status()
+		local os_ver, is_before_mavericks, ui_enabled, apple_accessibility_article
+		local err_msg, err_num, msg, t, b
+		
+		set os_ver to system version of (system info)
+		
+		considering numeric strings -- version strings
+			set is_before_mavericks to os_ver < "10.9"
+		end considering
+		
+		if is_before_mavericks then -- things changed in Mavericks (10.9)
+			-- check to see if assistive devices is enabled
 			tell application "System Events"
-				tell (first process whose frontmost is true)
-					set frontmost to true
-					tell window 1
-						UI elements
+				set ui_enabled to UI elements enabled
+			end tell
+			if ui_enabled is false then
+				tell application "System Preferences"
+					activate
+					set current pane to pane id "com.apple.preference.universalaccess"
+					display dialog "This script utilizes the built-in Graphic User Interface Scripting architecture of Mac OS X which is currently disabled." & return & return & "You can activate GUI Scripting by selecting the checkbox \"Enable access for assistive devices\" in the Accessibility preference pane." with icon 1 buttons {"Cancel"} default button 1
+				end tell
+			end if
+		else
+			-- In Mavericks (10.9) and later, the system should prompt the user with
+			-- instructions on granting accessibility access, so try to trigger that.
+			try
+				tell application "System Events"
+					tell (first process whose frontmost is true)
+						set frontmost to true
+						tell window 1
+							UI elements
+						end tell
 					end tell
 				end tell
-			end tell
-		on error err_msg number err_num
-			-- In some cases, the system prompt doesn't appear, so always give some info.
-			set msg to "Error: " & err_msg & " (" & err_num & ")"
-			if err_num is -1719 then
-				set apple_accessibility_article to "http://support.apple.com/en-us/HT202802"
-				set t to "GUI Scripting needs to be activated"
-				set msg to msg & return & return & "This script utilizes the built-in Graphic User Interface Scripting architecture of Mac OS X which is currently disabled." & return & return & "If the system doesn't prompt you with instructions for how to enable GUI scripting access, then see Apple's article at: " & return & apple_accessibility_article
-				set b to {"Go to Apple's Webpage", "Cancel"}
-				display alert t message msg buttons b default button 2
-				if button returned of result is b's item 1 then
-					tell me to open location apple_accessibility_article
+			on error err_msg number err_num
+				-- In some cases, the system prompt doesn't appear, so always give some info.
+				set msg to "Error: " & err_msg & " (" & err_num & ")"
+				if err_num is -1719 then
+					set apple_accessibility_article to "http://support.apple.com/en-us/HT202802"
+					set t to "GUI Scripting needs to be activated"
+					set msg to msg & return & return & "This script utilizes the built-in Graphic User Interface Scripting architecture of Mac OS X which is currently disabled." & return & return & "If the system doesn't prompt you with instructions for how to enable GUI scripting access, then see Apple's article at: " & return & apple_accessibility_article
+					set b to {"Go to Apple's Webpage", "Cancel"}
+					display alert t message msg buttons b default button 2
+					if button returned of result is b's item 1 then
+						tell me to open location apple_accessibility_article
+					end if
+					error number -128 --> User canceled
 				end if
-				error number -128 --> User canceled
-			end if
-		end try
-	end if
-end gui_scripting_status
+			end try
+		end if
+	end gui_scripting_status
+end script
