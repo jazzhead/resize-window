@@ -106,6 +106,8 @@ on make_controller() --> Controller
 				calculate_size()
 				resize_window()
 			end tell
+			
+			if app_window's has_alert() then ui_view's display_alert()
 		end run
 	end script
 end make_controller
@@ -128,6 +130,9 @@ on make_app_window() --> Model
 		property _is_width_only : missing value -- boolean
 		property _should_subtract_mac_menu : missing value -- boolean
 		property _is_mobile : missing value -- boolean
+		
+		property _alert_title : missing value -- string
+		property _alert_msg : missing value -- string
 		
 		on init(app_name) --> void
 			set _app_name to app_name
@@ -182,6 +187,13 @@ on make_app_window() --> Model
 			end if
 		end calculate_size
 		
+		on has_alert() --> boolean
+			if _alert_title is not missing value and _alert_title is not missing value then
+				return true
+			end if
+			return false
+		end has_alert
+		
 		(* == Setters == *)
 		
 		on set_mobile(true_or_false) --> void
@@ -211,6 +223,14 @@ on make_app_window() --> Model
 		on set_subtract_mac_menu(val) --> void
 			set _should_subtract_mac_menu to val
 		end set_subtract_mac_menu
+		
+		on set_alert_title(val) --> void
+			set _alert_title to val
+		end set_alert_title
+		
+		on set_alert_msg(val) --> void
+			set _alert_msg to val
+		end set_alert_msg
 		
 		(* == Getters == *)
 		
@@ -245,6 +265,14 @@ on make_app_window() --> Model
 		on get_new_height() --> int
 			return _new_height
 		end get_new_height
+		
+		on get_alert_title() --> string
+			return _alert_title
+		end get_alert_title
+		
+		on get_alert_msg() --> string
+			return _alert_msg
+		end get_alert_msg
 	end script
 end make_app_window
 
@@ -325,6 +353,13 @@ on make_ui(app_window) --> View
 		on get_size_choice() --> string
 			return _size_choice
 		end get_size_choice
+		
+		on display_alert() --> void
+			set t to _dialog_title & ": " & _app_window's get_alert_title()
+			tell application (_app_window's get_name())
+				display alert t message _app_window's get_alert_msg() as warning
+			end tell
+		end display_alert
 		
 		on which_dimensions() --> void
 			local dimension_choice, mac_menu_choice, m, b
@@ -448,6 +483,17 @@ on make_supported_app() --> abstract product
 				end tell
 			end using terms from
 		end reset_gui
+		
+		on set_default_alert()
+			set t to "Couldn't target window content area for resizing"
+			set m to "The height of the content area of the window could not be resized to the selected mobile dimensions, so the overall window frame height was resized instead."
+			set_alert(t, m)
+		end set_default_alert
+		
+		on set_alert(this_title, this_msg)
+			my set_alert_title(this_title)
+			my set_alert_msg(this_msg)
+		end set_alert
 	end script
 end make_supported_app
 
@@ -468,6 +514,7 @@ on make_safari_window() --> concrete product
 						tell application "System Events" to tell application process (my _app_name)
 							set frontmost to true
 							my reset_gui(it)
+							--tell window 1's scroll area 1 -- DEBUG: cause error for testing
 							tell window 1's tab group 1's group 1's group 1's scroll area 1
 								set h_adj to (attribute "AXSize"'s value as list)'s last item
 							end tell
@@ -477,7 +524,11 @@ on make_safari_window() --> concrete product
 						delay 0.1 -- give the UI time to catch up
 					end try
 				end repeat
-				if h_adj > 0 then my adjust_bottom((my _height) - h_adj)
+				if h_adj > 0 then
+					my adjust_bottom((my _height) - h_adj)
+				else
+					my set_default_alert()
+				end if
 			end if
 		end calculate_size
 	end script
@@ -515,7 +566,11 @@ on make_chrome_window() --> concrete product
 						end try
 					end tell
 				end tell
-				if h_adj > 0 then my adjust_bottom(h_adj)
+				if h_adj > 0 then
+					my adjust_bottom(h_adj)
+				else
+					my set_default_alert()
+				end if
 			end if
 		end calculate_size
 	end script
