@@ -58,7 +58,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
 
 (********** Code Overview
-	$ egrep "^(on|script|\(\* ====)" resize_window.applescript
+	$ egrep "^(on|script|\(\* ={4})" resize_window.applescript
 	on run -- main
 	(* ==== MVC Classes ==== *)
 	on make_controller() --> Controller
@@ -121,6 +121,7 @@ on make_app_window() --> Model
 		property _new_size : missing value -- string (or bool false)
 		property _new_width : missing value -- int
 		property _new_height : missing value -- int
+		
 		property _is_width_only : missing value -- boolean
 		property _should_subtract_mac_menu : missing value -- boolean
 		property _is_mobile : missing value -- boolean
@@ -182,10 +183,7 @@ on make_app_window() --> Model
 		end calculate_size
 		
 		on has_alert() --> boolean
-			if _alert_title is not missing value and _alert_title is not missing value then
-				return true
-			end if
-			return false
+			_alert_title is not missing value and _alert_msg is not missing value
 		end has_alert
 		
 		(* == Setters == *)
