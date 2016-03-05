@@ -514,7 +514,7 @@ on make_safari_window() --> concrete product
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
-			if my _is_mobile then
+			if my is_mobile() and not my is_width_only() then
 				set doc_height to 0
 
 				-- First try GUI scripting since it doesn't require JavaScript to be enabled
@@ -574,7 +574,7 @@ on make_chrome_window() --> concrete product
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
-			if my _is_mobile then
+			if my is_mobile() and not my is_width_only() then
 				set doc_height to 0
 				-- Google Chrome doesn't provide access to the dimensions of
 				-- the window scroll area via UI Scripting, so try JavaScript
@@ -608,7 +608,7 @@ end make_chrome_window
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds.
-			if my _is_mobile then
+			if my is_mobile() and not my is_width_only() then
 				-- XXX: Firefox doesn't provide access to the window content
 				-- area dimensions so just use a best-guess hardcoded value
 				-- (which could become outdated with app updates or if other
@@ -628,7 +628,7 @@ end make_firefox_window*)
 
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
-			if my _is_mobile then
+			if my is_mobile() and not my is_width_only() then
 				my Util's gui_scripting_status() -- requires GUI scripting
 				tell application "System Events" to tell application process (my _app_name)
 					tell window 1's scroll area 1's text area 1
