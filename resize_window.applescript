@@ -70,7 +70,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AN
 	on make_safari_window() --> concrete product
 	on make_webkit_window() --> concrete product
 	on make_chrome_window() --> concrete product
-	on make_firefox_window() --> concrete product
 	(* ==== Miscellaneous Classes ==== *)
 	script Util -- Utility Functions
 ********************)
@@ -88,7 +87,6 @@ on make_controller() --> Controller
 				-- Register apps that support resizing by window content area dimensions.
 				register_product(make_safari_window())
 				register_product(make_chrome_window())
-				register_product(make_firefox_window())
 				register_product(make_webkit_window())
 			end tell
 			
@@ -576,7 +574,10 @@ on make_chrome_window() --> concrete product
 	end script
 end make_chrome_window
 
-on make_firefox_window() --> concrete product
+-- Firefox doesn't provide access to AppleScript for inner window dimensions
+-- via either GUI Scripting or JavaScript, so don't even bother. Hardcoding
+-- values is too fragile. Just a use a browser that supports AppleScript.
+(*on make_firefox_window() --> concrete product
 	script
 		property class : "FirefoxWindow"
 		property parent : make_supported_app() -- extends SupportedApp
@@ -594,7 +595,7 @@ on make_firefox_window() --> concrete product
 			end if
 		end calculate_size
 	end script
-end make_firefox_window
+end make_firefox_window*)
 
 -- Just an example. It works, but it's not necessary, so don't register it with the factory in the final script.
 (*on make_textedit_window() --> concrete product
