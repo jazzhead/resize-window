@@ -65,7 +65,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AN
 	on make_app_window() --> Model
 	on make_ui(app_window) --> View
 	(* ==== Factory Pattern ==== *)
-	script AppFactory -- Factory
+	on make_factory() --> Factory
 	on make_supported_app() --> abstract product
 	on make_safari_window() --> concrete product
 	on make_webkit_window() --> concrete product
@@ -83,14 +83,15 @@ end run
 on make_controller() --> Controller
 	script
 		on run
-			tell my AppFactory
+			set app_factory to make_factory()
+			tell app_factory
 				-- Register apps that support resizing by window content area dimensions.
 				register_product(make_safari_window())
 				register_product(make_chrome_window())
 				register_product(make_webkit_window())
 			end tell
 			
-			set app_window to my AppFactory's make_window(my Util's get_front_app_name()) --> Model
+			set app_window to app_factory's make_window(my Util's get_front_app_name()) --> Model
 			
 			set ui_view to make_ui(app_window) --> View
 			tell ui_view
@@ -318,7 +319,13 @@ on make_ui(app_window) --> View
 			_menu_rule & Â
 			("About " & __SCRIPT_NAME__)
 		
-		(* == Methods == *)
+		(* == Getters == *)
+		
+		on get_size_choice() --> string
+			return _size_choice
+		end get_size_choice
+		
+		(* == View Methods == *)
 		
 		on create_view() --> void
 			local m
@@ -347,10 +354,6 @@ on make_ui(app_window) --> View
 			
 			_handle_user_action()
 		end create_view
-		
-		on get_size_choice() --> string
-			return _size_choice
-		end get_size_choice
 		
 		on display_alert() --> void
 			set t to _dialog_title & ": " & _app_window's get_alert_title()
@@ -425,32 +428,39 @@ end make_ui
 
 (* ==== Factory Pattern ==== *)
 
-script AppFactory -- Factory
-	property class : "AppFactory"
-	property _registered_products : {} -- array (concrete products)
-	
-	on register_product(this_product) --> void
-		set end of _registered_products to this_product
-	end register_product
-	
-	on make_window(app_name) --> AppWindow
-		repeat with this_product in _registered_products
-			if app_name is this_product's to_string() then
-				this_product's init(app_name)
-				return this_product
-			end if
-		end repeat
-		-- fallback to generic app window w/o inner dimension support
-		set this_app to make_app_window() --> AppWindow superclass (Model)
-		this_app's init(app_name)
-		return this_app
-	end make_window
-end script
+on make_factory() --> Factory
+	script
+		property class : "AppFactory"
+		property _registered_products : {} -- array (concrete products)
+		
+		on register_product(this_product) --> void
+			set end of _registered_products to this_product
+		end register_product
+		
+		on make_window(app_name) --> AppWindow
+			repeat with this_product in _registered_products
+				if app_name is this_product's to_string() then
+					this_product's init(app_name)
+					return this_product
+				end if
+			end repeat
+			-- fallback to generic app window w/o inner dimension support
+			set this_app to make_app_window() --> AppWindow superclass (Model)
+			this_app's init(app_name)
+			return this_app
+		end make_window
+	end script
+end make_factory
 
 on make_supported_app() --> abstract product
 	script
 		property class : "SupportedApp"
 		property parent : make_app_window() -- extends AppWindow (Model)
+		
+		property _js : "window.innerHeight ||
+				document.documentElement.clientHeight ||
+				document.body.clientHeight ||
+				document.body.offsetHeight;" -- string (JavaScript program)
 		
 		on to_string() --> string
 			return my short_name
@@ -484,7 +494,7 @@ on make_supported_app() --> abstract product
 		
 		on set_default_alert()
 			set t to "Couldn't target window content area for resizing"
-			set m to "The height of the content area of the window could not be resized to the selected mobile dimensions, so the overall window frame height was resized instead."
+			set m to "The height of the content area of the window could not be resized to the selected mobile dimensions, so the overall window frame height was resized instead." & return & return & "Try enabling JavaScript if it's not already enabled and rerun the script."
 			set_alert(t, m)
 		end set_default_alert
 		
@@ -505,8 +515,10 @@ on make_safari_window() --> concrete product
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my _is_mobile then
-				my Util's gui_scripting_status() -- requires GUI scripting
-				set h_adj to 0
+				set doc_height to 0
+				
+				-- First try GUI scripting since it doesn't require JavaScript to be enabled
+				my Util's gui_scripting_status()
 				repeat 10 times -- until hopefully GUI scripting succeeds
 					try
 						tell application "System Events" to tell application process (my _app_name)
@@ -514,7 +526,7 @@ on make_safari_window() --> concrete product
 							my reset_gui(it)
 							--tell window 1's scroll area 1 -- DEBUG: cause error for testing
 							tell window 1's tab group 1's group 1's group 1's scroll area 1
-								set h_adj to (attribute "AXSize"'s value as list)'s last item
+								set doc_height to (attribute "AXSize"'s value as list)'s last item
 							end tell
 						end tell
 						exit repeat
@@ -522,8 +534,21 @@ on make_safari_window() --> concrete product
 						delay 0.1 -- give the UI time to catch up
 					end try
 				end repeat
-				if h_adj > 0 then
-					my adjust_bottom((my _height) - h_adj)
+				
+				-- If GUI Scripting fails (possibly because of changes between
+				-- app versions), try JavaScript
+				if doc_height = 0 then
+					try
+						using terms from application "Safari"
+							tell application (my _app_name)
+								set doc_height to (do JavaScript my _js in document 1) as integer
+							end tell
+						end using terms from
+					end try
+				end if
+				
+				if doc_height > 0 then
+					my adjust_bottom((my _height) - doc_height)
 				else
 					my set_default_alert()
 				end if
@@ -550,22 +575,19 @@ on make_chrome_window() --> concrete product
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my _is_mobile then
-				my Util's gui_scripting_status() -- requires GUI scripting
-				set h_adj to 0
-				tell application "System Events" to tell application process (my _app_name)
-					set frontmost to true
-					my reset_gui(it)
-					tell window 1
-						try
-							set h_adj to h_adj + ((toolbar 1's attribute "AXSize"'s value as list)'s last item)
-						end try
-						try
-							set h_adj to h_adj + ((tab group 1's attribute "AXSize"'s value as list)'s last item)
-						end try
-					end tell
-				end tell
-				if h_adj > 0 then
-					my adjust_bottom(h_adj)
+				set doc_height to 0
+				-- Google Chrome doesn't provide access to the dimensions of
+				-- the window scroll area via UI Scripting, so try JavaScript
+				-- instead.
+				try
+					using terms from application "Google Chrome"
+						tell application (my _app_name)
+							set doc_height to (execute front window's active tab javascript my _js) as integer
+						end tell
+					end using terms from
+				end try
+				if doc_height > 0 then
+					my adjust_bottom((my _height) - doc_height)
 				else
 					my set_default_alert()
 				end if
