@@ -92,20 +92,14 @@ on make_controller() --> Controller
 			end tell
 			
 			set app_window to app_factory's make_window(my Util's get_front_app_name()) --> Model
-			
 			set ui_view to make_ui(app_window) --> View
-			tell ui_view
-				create_view()
-				if get_size_choice() is false then return -- no (more) adjustments
-			end tell
 			
-			app_window's validate_window_size(ui_view's get_size_choice())
-			ui_view's which_dimensions()
-			tell app_window
-				calculate_size()
-				resize_window()
-			end tell
-			
+			ui_view's create_view() -- primary dialog
+			if app_window's get_new_size() is false then return -- no (more) adjustments
+			app_window's validate_window_size()
+			ui_view's which_dimensions() -- secondary dialogs
+			app_window's calculate_size()
+			app_window's resize_window()
 			if app_window's has_alert() then ui_view's display_alert()
 		end run
 	end script
@@ -124,6 +118,7 @@ on make_app_window() --> Model
 		property _top : missing value -- int
 		property _bottom : missing value -- int
 		
+		property _new_size : missing value -- string (or bool false)
 		property _new_width : missing value -- int
 		property _new_height : missing value -- int
 		property _is_width_only : missing value -- boolean
@@ -149,13 +144,13 @@ on make_app_window() --> Model
 			return {_left, _top, _right, _bottom}
 		end resize_window
 		
-		on validate_window_size(size_choice) --> void
+		on validate_window_size() --> void
 			local msg, txt
 			set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
 			
 			try
-				set size_choice to my Util's split_text(size_choice, tab)'s first item
-				set {_new_width, _new_height} to my Util's split_text(size_choice, "x")
+				set _new_size to my Util's split_text(_new_size, tab)'s first item
+				set {_new_width, _new_height} to my Util's split_text(_new_size, "x")
 			on error
 				set txt to "Invalid window size"
 				my Util's error_with_alert(txt, msg)
@@ -195,6 +190,10 @@ on make_app_window() --> Model
 		
 		(* == Setters == *)
 		
+		on set_new_size(new_size) --> void
+			set _new_size to new_size
+		end set_new_size
+		
 		on set_mobile(true_or_false) --> void
 			set _is_mobile to true_or_false
 		end set_mobile
@@ -232,6 +231,10 @@ on make_app_window() --> Model
 		end set_alert_msg
 		
 		(* == Getters == *)
+		
+		on get_new_size() --> string (or bool false)
+			return _new_size
+		end get_new_size
 		
 		on is_mobile() --> boolean
 			return _is_mobile
@@ -319,12 +322,6 @@ on make_ui(app_window) --> View
 			_menu_rule & Â
 			("About " & __SCRIPT_NAME__)
 		
-		(* == Getters == *)
-		
-		on get_size_choice() --> string
-			return _size_choice
-		end get_size_choice
-		
 		(* == View Methods == *)
 		
 		on create_view() --> void
@@ -353,6 +350,7 @@ on make_ui(app_window) --> View
 			end if
 			
 			_handle_user_action()
+			_app_window's set_new_size(_size_choice)
 		end create_view
 		
 		on display_alert() --> void
