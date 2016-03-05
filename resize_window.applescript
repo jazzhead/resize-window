@@ -90,10 +90,10 @@ on make_controller() --> Controller
 				register_product(make_chrome_window())
 				register_product(make_webkit_window())
 			end tell
-			
+
 			set app_window to app_factory's make_window(my Util's get_front_app_name()) --> Model
 			set ui_view to make_ui(app_window) --> View
-			
+
 			ui_view's create_view() -- primary dialog
 			if app_window's get_new_size() is false then return -- no (more) adjustments
 			app_window's validate_window_size()
@@ -110,25 +110,25 @@ on make_app_window() --> Model
 		property class : "AppWindow" -- superclass
 		property _app_name : missing value -- string
 		property _mac_menu_bar : 23 -- int (22px menu plus 1px bottom border)
-		
+
 		property _width : missing value -- int
 		property _height : missing value -- int
 		property _left : missing value -- int
 		property _right : missing value -- int
 		property _top : missing value -- int
 		property _bottom : missing value -- int
-		
+
 		property _new_size : missing value -- string (or bool false)
 		property _new_width : missing value -- int
 		property _new_height : missing value -- int
-		
+
 		property _is_width_only : missing value -- boolean
 		property _should_subtract_mac_menu : missing value -- boolean
 		property _is_mobile : missing value -- boolean
-		
+
 		property _alert_title : missing value -- string
 		property _alert_msg : missing value -- string
-		
+
 		on init(app_name) --> void
 			set _app_name to app_name
 			tell application _app_name
@@ -137,18 +137,18 @@ on make_app_window() --> Model
 				set _height to _bottom - _top
 			end tell
 		end init
-		
+
 		on resize_window() --> void
 			tell application _app_name
 				set bounds of window 1 to {_left, _top, _right, _bottom}
 			end tell
 			return {_left, _top, _right, _bottom}
 		end resize_window
-		
+
 		on validate_window_size() --> void
 			local msg, txt
 			set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
-			
+
 			try
 				set _new_size to my Util's split_text(_new_size, tab)'s first item
 				set {_new_width, _new_height} to my Util's split_text(_new_size, "x")
@@ -156,12 +156,12 @@ on make_app_window() --> Model
 				set txt to "Invalid window size"
 				my Util's error_with_alert(txt, msg)
 			end try
-			
+
 			if _new_width is "" or _new_height is "" then
 				set txt to "Invalid width and/or height"
 				my Util's error_with_alert(txt, msg)
 			end if
-			
+
 			try
 				_new_width as integer
 				_new_height as integer
@@ -171,7 +171,7 @@ on make_app_window() --> Model
 				my Util's error_with_alert(txt, msg)
 			end try
 		end validate_window_size
-		
+
 		on calculate_size() --> void
 			set_right(_left + _new_width)
 			if not _is_width_only then
@@ -181,95 +181,98 @@ on make_app_window() --> Model
 				end if
 			end if
 		end calculate_size
-		
+
 		on has_alert() --> boolean
 			_alert_title is not missing value and _alert_msg is not missing value
 		end has_alert
-		
+
 		(* == Setters == *)
-		
+
+		on set_mobile(true_or_false) --> void
+			my Util's validate_boolean_arg(true_or_false, "set_mobile")
+			set _is_mobile to true_or_false
+		end set_mobile
+
+		on set_width_only(true_or_false) --> void
+			my Util's validate_boolean_arg(true_or_false, "set_width_only")
+			set _is_width_only to true_or_false
+		end set_width_only
+
+		on set_subtract_mac_menu(true_or_false) --> void
+			my Util's validate_boolean_arg(true_or_false, "set_subtract_mac_menu")
+			set _should_subtract_mac_menu to true_or_false
+		end set_subtract_mac_menu
+
 		on set_new_size(new_size) --> void
 			set _new_size to new_size
 		end set_new_size
-		
-		on set_mobile(true_or_false) --> void
-			set _is_mobile to true_or_false
-		end set_mobile
-		
+
 		on set_right(val) --> void
 			set _right to val
 		end set_right
-		
+
 		on set_bottom(val) --> void
 			set _bottom to val
 		end set_bottom
-		
+
 		on adjust_right(val) --> void
 			set_right(_right + val)
 		end adjust_right
-		
+
 		on adjust_bottom(val) --> void
 			set_bottom(_bottom + val)
 		end adjust_bottom
-		
-		on set_width_only(val) --> void
-			set _is_width_only to val
-		end set_width_only
-		
-		on set_subtract_mac_menu(val) --> void
-			set _should_subtract_mac_menu to val
-		end set_subtract_mac_menu
-		
+
 		on set_alert_title(val) --> void
 			set _alert_title to val
 		end set_alert_title
-		
+
 		on set_alert_msg(val) --> void
 			set _alert_msg to val
 		end set_alert_msg
-		
+
 		(* == Getters == *)
-		
+
 		on get_new_size() --> string (or bool false)
 			return _new_size
 		end get_new_size
-		
+
 		on is_mobile() --> boolean
 			return _is_mobile
 		end is_mobile
-		
+
 		on is_width_only() --> boolean
 			return _is_width_only
 		end is_width_only
-		
+
 		on get_name() --> string
 			return _app_name
 		end get_name
-		
+
 		on get_mac_menu_bar() --> int
 			return _mac_menu_bar
 		end get_mac_menu_bar
-		
+
 		on get_width() --> int
 			return _width
 		end get_width
-		
+
 		on get_height() --> int
 			return _height
 		end get_height
-		
+
 		on get_new_width() --> int
 			return _new_width
 		end get_new_width
-		
+
 		on get_new_height() --> int
 			return _new_height
 		end get_new_height
-		
+
 		on get_alert_title() --> string
 			return _alert_title
 		end get_alert_title
-		
+
 		on get_alert_msg() --> string
 			return _alert_msg
 		end get_alert_msg
@@ -280,17 +283,17 @@ on make_ui(app_window) --> View
 	script
 		property _app_window : app_window -- Model
 		property _size_choice : missing value -- string
-		
+
 		(* == View Components == *)
-		
+
 		property _dialog_title : __SCRIPT_NAME__
 		property _custom_choice : "Custom sizeÉ"
 		property _u_dash : Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 		property _menu_rule : my Util's multiply_text(_u_dash, 21)
-		
+
 		property _width_increments : {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
 		property _height_increments : {"Height + 1px", "Height - 1px", "Height + 10px", "Height - 10px"}
-		
+
 		property _mobile_sizes : paragraphs of "320x480		iPhone 4 Ñ Portrait (2x)
 480x320		iPhone 4 Ñ Landscape (2x)
 320x568		iPhone 5 Ñ Portrait (2x)
@@ -301,13 +304,13 @@ on make_ui(app_window) --> View
 736x414		iPhone 6 Plus Ñ Landscape (3x)
 768x1024	iPad Ñ Portrait (2x)
 1024x768	iPad Ñ Landscape (2x)"
-		
+
 		property _desktop_sizes : paragraphs of "640x480		VGA (4:3)
 800x600		SVGA (4:3)
 1024x768	XGA (4:3)
 1280x800	WXGA (16:10)
 1366x768	WXGA (16:9)"
-		
+
 		property _size_list : _mobile_sizes & Â
 			_menu_rule & Â
 			_desktop_sizes & Â
@@ -319,9 +322,9 @@ on make_ui(app_window) --> View
 			_custom_choice & Â
 			_menu_rule & Â
 			("About " & __SCRIPT_NAME__)
-		
+
 		(* == View Methods == *)
-		
+
 		on create_view() --> void
 			local m
 			tell _app_window
@@ -337,7 +340,7 @@ on make_ui(app_window) --> View
 			end repeat
 			if _size_choice is false then error number -128 -- User canceled
 			set _size_choice to _size_choice as string
-			
+
 			-- Only supported apps can target the window body for mobile sizes.
 			-- Those supported apps will have a different class name than the
 			-- generic fallback "AppWindow".
@@ -346,18 +349,18 @@ on make_ui(app_window) --> View
 			else
 				_app_window's set_mobile(false)
 			end if
-			
+
 			_handle_user_action()
 			_app_window's set_new_size(_size_choice)
 		end create_view
-		
+
 		on display_alert() --> void
 			set t to _dialog_title & ": " & _app_window's get_alert_title()
 			tell application (_app_window's get_name())
 				display alert t message _app_window's get_alert_msg() as warning
 			end tell
 		end display_alert
-		
+
 		on which_dimensions() --> void
 			local dimension_choice, mac_menu_choice, m, b
 			tell _app_window
@@ -367,11 +370,12 @@ on make_ui(app_window) --> View
 			display dialog m with title _dialog_title buttons b default button 3
 			set dimension_choice to button returned of result
 			if dimension_choice is b's item 3 then
+				--_app_window's set_width_only("DEBUG: not a boolean") -- DEBUG: throw error
 				_app_window's set_width_only(true)
 			else
 				_app_window's set_width_only(false)
 			end if
-			
+
 			_app_window's set_subtract_mac_menu(false)
 			if not _app_window's is_width_only() and not _app_window's is_mobile() then
 				set m to "Subtract Mac Menu Bar height (" & _app_window's get_mac_menu_bar() & "px)?"
@@ -383,7 +387,7 @@ on make_ui(app_window) --> View
 				end if
 			end if
 		end which_dimensions
-		
+
 		on _handle_user_action() --> void -- PRIVATE
 			local t, b, m, btn_choice
 			local width_or_height, _sign, _amount, size_adjustment
@@ -428,11 +432,11 @@ on make_factory() --> Factory
 	script
 		property class : "AppFactory"
 		property _registered_products : {} -- array (concrete products)
-		
+
 		on register_product(this_product) --> void
 			set end of _registered_products to this_product
 		end register_product
-		
+
 		on make_window(app_name) --> AppWindow
 			repeat with this_product in _registered_products
 				if app_name is this_product's to_string() then
@@ -452,16 +456,16 @@ on make_supported_app() --> abstract product
 	script
 		property class : "SupportedApp"
 		property parent : make_app_window() -- extends AppWindow (Model)
-		
+
 		property _js : "window.innerHeight ||
 				document.documentElement.clientHeight ||
 				document.body.clientHeight ||
 				document.body.offsetHeight;" -- string (JavaScript program)
-		
+
 		on to_string() --> string
 			return my short_name
 		end to_string
-		
+
 		on reset_gui(app_process)
 			using terms from application "System Events"
 				tell app_process
@@ -487,13 +491,13 @@ on make_supported_app() --> abstract product
 				end tell
 			end using terms from
 		end reset_gui
-		
+
 		on set_default_alert()
 			set t to "Couldn't target window content area for resizing"
 			set m to "The height of the content area of the window could not be resized to the selected mobile dimensions, so the overall window frame height was resized instead." & return & return & "Try enabling JavaScript if it's not already enabled and rerun the script."
 			set_alert(t, m)
 		end set_default_alert
-		
+
 		on set_alert(this_title, this_msg)
 			my set_alert_title(this_title)
 			my set_alert_msg(this_msg)
@@ -506,13 +510,13 @@ on make_safari_window() --> concrete product
 		property class : "SafariWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Safari"
-		
+
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my _is_mobile then
 				set doc_height to 0
-				
+
 				-- First try GUI scripting since it doesn't require JavaScript to be enabled
 				my Util's gui_scripting_status()
 				repeat 10 times -- until hopefully GUI scripting succeeds
@@ -530,7 +534,7 @@ on make_safari_window() --> concrete product
 						delay 0.1 -- give the UI time to catch up
 					end try
 				end repeat
-				
+
 				-- If GUI Scripting fails (possibly because of changes between
 				-- app versions), try JavaScript
 				if doc_height = 0 then
@@ -542,7 +546,7 @@ on make_safari_window() --> concrete product
 						end using terms from
 					end try
 				end if
-				
+
 				if doc_height > 0 then
 					my adjust_bottom((my _height) - doc_height)
 				else
@@ -566,7 +570,7 @@ on make_chrome_window() --> concrete product
 		property class : "ChromeWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Chrome"
-		
+
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
@@ -600,7 +604,7 @@ end make_chrome_window
 		property class : "FirefoxWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Firefox"
-		
+
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds.
@@ -621,7 +625,7 @@ end make_firefox_window*)
 		property class : "TextEditWindow"
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "TextEdit"
-		
+
 		on calculate_size()
 			continue calculate_size() -- call superclass's method first
 			if my _is_mobile then
@@ -643,7 +647,7 @@ end make_textedit_window*)
 script Util -- Utility Functions
 	on get_front_app_name() --> string
 		tell application "System Events"
-			
+
 			-- Ignore (Apple)Script Editor and Terminal when getting the front app
 			-- name since most of the time they will just be used during
 			-- development and testing to run the script.
@@ -666,12 +670,20 @@ script Util -- Utility Functions
 		end tell
 		return current_app
 	end get_front_app_name
-	
+
 	on error_with_alert(txt, msg) --> void
 		display alert txt message msg as critical buttons {"Cancel"} default button 1
 		error number -128 -- User canceled
 	end error_with_alert
-	
+
+	on validate_boolean_arg(boolean_arg, func_name)
+		try
+			boolean_arg as boolean
+		on error err_msg number err_num
+			error func_name & "(): Boolean argument required. " & err_msg number err_num
+		end try
+	end validate_boolean_arg
+
 	on multiply_text(str, n) --> string
 		if n < 1 or str = "" then return ""
 		set lst to {}
@@ -680,7 +692,7 @@ script Util -- Utility Functions
 		end repeat
 		return lst as string
 	end multiply_text
-	
+
 	on split_text(txt, delim) --> array
 		try
 			set AppleScript's text item delimiters to (delim as string)
@@ -692,17 +704,17 @@ script Util -- Utility Functions
 			error "Can't split_text: " & err_msg number err_num
 		end try
 	end split_text
-	
+
 	on gui_scripting_status()
 		local os_ver, is_before_mavericks, ui_enabled, apple_accessibility_article
 		local err_msg, err_num, msg, t, b
-		
+
 		set os_ver to system version of (system info)
-		
+
 		considering numeric strings -- version strings
 			set is_before_mavericks to os_ver < "10.9"
 		end considering
-		
+
 		if is_before_mavericks then -- things changed in Mavericks (10.9)
 			-- check to see if assistive devices is enabled
 			tell application "System Events"
@@ -745,3 +757,4 @@ script Util -- Utility Functions
 		end if
 	end gui_scripting_status
 end script
+
