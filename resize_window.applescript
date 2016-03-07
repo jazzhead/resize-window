@@ -96,7 +96,7 @@ on make_app_controller() --> Controller
 			set view_controller to make_view_controller(app_model) --> Controller
 			set app_view to make_ui(app_model, view_controller) --> View
 
-			app_view's create_view() -- primary dialog
+			app_view's show_view() -- primary dialog
 			if app_model's get_new_size() is false then return -- no (more) adjustments
 			app_view's which_dimensions() -- secondary dialogs
 			app_model's resize_window(true)
@@ -109,29 +109,77 @@ on make_view_controller(app_model) --> Controller
 	script
 		property _model : app_model -- Model
 
+		on go_to_website() --> void
+			open location __SCRIPT_WEBSITE__ -- in default web browser
+		end go_to_website
+
+		-- @param string|boolean Description of chosen size (or 'false'); to be parsed
 		on set_new_size(size_choice) --> void
 			_model's set_new_size(size_choice)
 		end set_new_size
 
+		-- Prevent further window resizing
 		on set_done() --> void
 			_model's set_new_size(false)
 		end set_done
 
+		-- @param boolean Should only the window width be resized?
 		on set_width_only(true_or_false) --> void
 			_model's set_width_only(true_or_false)
 		end set_width_only
 
+		-- @param boolean Should the Mac menu bar height be subtracted?
 		on set_subtract_mac_menu(true_or_false) --> void
 			_model's set_subtract_mac_menu(true_or_false)
 		end set_subtract_mac_menu
 
+		-- @param int New window width
+		on set_width(val) --> void
+			_set_width_or_height("width", val)
+		end set_width
+
+		-- @param int New window height
+		on set_height(val) --> void
+			_set_width_or_height("height", val)
+		end set_height
+
+		-- @param string Increment/decrement menu option, e.g., "width + 10px"
 		on increment_width_or_height(size_choice) --> void
-			_model's increment_width_or_height(size_choice)
+			set {width_or_height, int_sign, int_val} to my Util's split_text(size_choice, space)
+			if int_val ends with "px" then set int_val to text 1 thru -3 of int_val as integer
+			set size_adjustment to int_sign & int_val as integer
+			ignoring case
+				if width_or_height is "Width" then
+					_model's adjust_width(size_adjustment)
+				else
+					_model's adjust_height(size_adjustment)
+				end if
+			end ignoring
+			_model's resize_window(false) -- false = don't calculate new size; already calculated
+			_model's set_new_size(false) -- to prevent further resizing
 		end increment_width_or_height
 
-		on go_to_website() --> void
-			open location __SCRIPT_WEBSITE__ -- in default web browser
-		end go_to_website
+		(* == Private == *)
+
+		-- @param 1 string The dimension to change -- "width" or "height"
+		-- @param 2 string Exact or incremental value, i.e., unsigned or signed integer, respectively.
+		on _set_width_or_height(width_or_height, val) --> void -- PRIVATE
+			if first character of val is in {"+", "-"} then -- increment/decrement the size
+				if width_or_height is "width" then
+					_model's adjust_width(val as integer)
+				else
+					_model's adjust_height(val as integer)
+				end if
+			else -- exact size
+				if width_or_height is "width" then
+					_model's set_width(val as integer)
+				else
+					_model's set_height(val as integer)
+				end if
+			end if
+			_model's resize_window(false) -- false = don't calculate new size; already calculated
+			_model's set_new_size(false) -- to prevent further resizing
+		end _set_width_or_height
 	end script
 end make_view_controller
 
@@ -159,8 +207,8 @@ on make_app_window() --> Model
 		property _alert_title : missing value -- string
 		property _alert_msg : missing value -- string
 
-		-- Preconfigured sizes (used by View to build menu):
-
+		-- Preconfigured sizes (used by the View to build the menu):
+		--
 		property _mobile_sizes : paragraphs of "320x480		iPhone 4 Ñ Portrait (2x)
 480x320		iPhone 4 Ñ Landscape (2x)
 320x568		iPhone 5 Ñ Portrait (2x)
@@ -171,7 +219,7 @@ on make_app_window() --> Model
 736x414		iPhone 6 Plus Ñ Landscape (3x)
 768x1024	iPad Ñ Portrait (2x)
 1024x768	iPad Ñ Landscape (2x)" -- array
-
+		--
 		property _desktop_sizes : paragraphs of "640x480		VGA (4:3)
 800x600		SVGA (4:3)
 1024x768	XGA (4:3)
@@ -180,6 +228,12 @@ on make_app_window() --> Model
 
 		(* == Public Methods == *)
 
+		-- @param[in] string The name of the target (frontmost) application
+		-- @param[out] string _app_name Same as input parameter
+		-- @param[out] boolean _should_subtract_mac_menu Initialized to false
+		-- @param[out] int _left,_top,_right,_bottom Current window bounds
+		-- @param[out] int _width,_height Current window dimensions
+		-- @return Nothing
 		on init(app_name) --> void
 			set _app_name to app_name
 			set _should_subtract_mac_menu to false -- default
@@ -190,40 +244,25 @@ on make_app_window() --> Model
 			end tell
 		end init
 
+		-- @param boolean Does the new window size need to be calculated?
 		on resize_window(should_calculate) --> void
 			if should_calculate then calculate_size()
 			tell application _app_name
 				set bounds of window 1 to {_left, _top, _right, _bottom}
 			end tell
-			return {_left, _top, _right, _bottom}
+			return {_left, _top, _right, _bottom} -- for debugging; not used
 		end resize_window
 
 		-- This method is overridden by subclasses to get custom behavior
 		on calculate_size() --> void
-			set_right(_left + _new_width)
+			set_width(_new_width)
 			if not _is_width_only then
-				set_bottom(_top + _new_height)
+				set_height(_new_height)
 				if _should_subtract_mac_menu then
-					adjust_bottom(-_mac_menu_bar)
+					adjust_height(-_mac_menu_bar)
 				end if
 			end if
 		end calculate_size
-
-		-- @param string Examples: "width + 10" or "height - 20px" ('px' is optional)
-		on increment_width_or_height(size_choice) --> void
-			set {width_or_height, _sign, _amount} to my Util's split_text(size_choice, space)
-			if _amount ends with "px" then set _amount to text 1 thru -3 of _amount as integer
-			set size_adjustment to _sign & _amount as integer
-			ignoring case
-				if width_or_height is "Width" then
-					adjust_right(size_adjustment)
-				else
-					adjust_bottom(size_adjustment)
-				end if
-			end ignoring
-			resize_window(false) -- false = don't calculate new size; already calculated
-			set _new_size to false -- to prevent further resizing
-		end increment_width_or_height
 
 		on has_alert() --> boolean
 			_alert_title is not missing value and _alert_msg is not missing value
@@ -231,11 +270,17 @@ on make_app_window() --> Model
 
 		(* == Private Methods == *)
 
+		-- @param[in]  string Description of chosen size
+		-- @param[out] string _new_size Formatted size, e.g., "1024x768"
+		-- @param[out] int    _new_width
+		-- @param[out] int    _new_height
+		-- @return Nothing
 		on _parse_window_size(new_size) --> void -- PRIVATE
-			set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
+			set msg to "Window size should be formatted as WIDTHxHEIGHT (integers separated by an \"x\")."
 
 			try
-				set _new_size to my Util's split_text(new_size, tab)'s first item
+				set _new_size to my Util's split_text(new_size, tab)'s first item -- get size string
+				set _new_size to my Util's split_text(_new_size, space) as string -- delete spaces
 				set {_new_width, _new_height} to my Util's split_text(_new_size, "x")
 			on error
 				set txt to "Invalid window size"
@@ -268,6 +313,7 @@ on make_app_window() --> Model
 
 		(* == Setters == *)
 
+		-- @param string|boolean Description of chosen size (or 'false'); to be parsed
 		on set_new_size(new_size) --> void
 			if new_size is false then
 				set _new_size to false
@@ -277,36 +323,44 @@ on make_app_window() --> Model
 			_parse_window_size(new_size) -- sets {_new_size, _new_width, _new_height}
 		end set_new_size
 
+		-- @param boolean Should only the window width be resized?
 		on set_width_only(true_or_false) --> void
 			my Util's validate_boolean_arg(true_or_false, "set_width_only")
 			set _is_width_only to true_or_false
 		end set_width_only
 
+		-- @param boolean Should the Mac menu bar height be subtracted?
 		on set_subtract_mac_menu(true_or_false) --> void
 			my Util's validate_boolean_arg(true_or_false, "set_subtract_mac_menu")
 			set _should_subtract_mac_menu to true_or_false
 		end set_subtract_mac_menu
 
-		on set_right(val) --> void
-			set _right to val
-		end set_right
+		-- @param int New window width
+		on set_width(val) --> void
+			set _right to _left + val
+		end set_width
 
-		on set_bottom(val) --> void
-			set _bottom to val
-		end set_bottom
+		-- @param int New window height
+		on set_height(val) --> void
+			set _bottom to _top + val
+		end set_height
 
-		on adjust_right(val) --> void
-			set_right(_right + val)
-		end adjust_right
+		-- @param int Value to add or substract from window width
+		on adjust_width(val) --> void
+			set _right to _right + val
+		end adjust_width
 
-		on adjust_bottom(val) --> void
-			set_bottom(_bottom + val)
-		end adjust_bottom
+		-- @param int Value to add or substract from window height
+		on adjust_height(val) --> void
+			set _bottom to _bottom + val
+		end adjust_height
 
+		-- @param string Alert dialog title
 		on set_alert_title(val) --> void
 			set _alert_title to val
 		end set_alert_title
 
+		-- @param string Alert dialog message
 		on set_alert_msg(val) --> void
 			set _alert_msg to val
 		end set_alert_msg
@@ -368,12 +422,12 @@ on make_ui(app_model, app_controller) --> View
 		(* == View Components == *)
 
 		property _dialog_title : __SCRIPT_NAME__
-		property _custom_choice : "Custom sizeÉ"
 		property _u_dash : Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
 		property _menu_rule : my Util's multiply_text(_u_dash, 21) -- string
 
 		property _width_increments : {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
 		property _height_increments : {"Height + 1px", "Height - 1px", "Height + 10px", "Height - 10px"}
+		property _custom_options : {"Custom SizeÉ", "Custom WidthÉ", "Custom HeightÉ"}
 
 		-- main dialog menu
 		property _menu : _model's _mobile_sizes & Â
@@ -384,13 +438,13 @@ on make_ui(app_model, app_controller) --> View
 			_menu_rule & Â
 			_height_increments & Â
 			_menu_rule & Â
-			_custom_choice & Â
+			_custom_options & Â
 			_menu_rule & Â
 			("About " & __SCRIPT_NAME__) -- array
 
 		(* == View Methods == *)
 
-		on create_view() --> void
+		on show_view() --> void
 			local m
 			tell _model
 				set m to "Choose a size for " & get_name() & "'s front window" & return & "(currently " & get_width() & "x" & get_height() & "):"
@@ -404,9 +458,10 @@ on make_ui(app_model, app_controller) --> View
 				end if
 			end repeat
 			_action_performed(action_event)
-		end create_view
+		end show_view
 
 		on which_dimensions() --> void
+			local m
 			tell _model
 				set m to "Resize both the window's width and height (" & get_new_width() & "x" & get_new_height() & ") or just the width (" & get_new_width() & ")?"
 			end tell
@@ -416,7 +471,7 @@ on make_ui(app_model, app_controller) --> View
 			_controller's set_width_only(dimension_choice is b's item 3) -- boolean arg
 
 			if not _model's is_width_only() and not _model's is_mobile() then
-				set m to "Subtract Mac Menu Bar height (" & _model's get_mac_menu_bar() & "px)?"
+				set m to "Subtract Mac menu bar height (" & _model's get_mac_menu_bar() & "px)?"
 				set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
 				display dialog m with title _dialog_title buttons b default button 3
 				set mac_menu_choice to button returned of result
@@ -439,8 +494,8 @@ on make_ui(app_model, app_controller) --> View
 
 			if action_event is _menu's last item then
 				_display_about()
-			else if action_event is _custom_choice then
-				_prompt_custom()
+			else if action_event is in _custom_options then
+				_prompt_custom(action_event)
 			else if action_event is in _width_increments & _height_increments then
 				_controller's increment_width_or_height(action_event)
 			else
@@ -466,10 +521,30 @@ on make_ui(app_model, app_controller) --> View
 			_controller's set_done()
 		end _display_about
 
-		on _prompt_custom() --> void -- PRIVATE
-			set m to "Type in a custom width and height separated by an \"x\":"
-			display dialog m with title _dialog_title default answer "1024x768"
-			_controller's set_new_size(text returned of result) -- model will parse/validate input
+		on _prompt_custom(action_event) --> void -- PRIVATE
+			set bp to "Any number can be prefixed with \"+\" or \"-\" to add or subtract that amount instead of setting a specific size."
+
+			if action_event is _custom_options's item 1 then
+				set m to "Enter a custom width and height separated by an \"x\". The current window size is prefilled by default." --& return & return & bp
+				set a to _model's get_width() & "x" & _model's get_height() as string
+			else if action_event is _custom_options's item 2 then
+				set m to "Enter a custom width. The current window width is prefilled by default." & return & return & bp
+				set a to _model's get_width()
+			else
+				set m to "Enter a custom height. The current window height is prefilled by default." & return & return & bp
+				set a to _model's get_height()
+			end if
+
+			display dialog m with title _dialog_title default answer a
+			set action_input to text returned of result
+
+			if action_event is _custom_options's item 1 then
+				_controller's set_new_size(action_input)
+			else if action_event is _custom_options's item 2 then
+				_controller's set_width(action_input)
+			else
+				_controller's set_height(action_input)
+			end if
 		end _prompt_custom
 	end script
 end make_ui
@@ -561,11 +636,13 @@ on make_safari_window() --> concrete product
 
 		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
-			-- Resize mobile sizes by the window content area instead of the window bounds
+			-- Resize mobile sizes by the window content area instead of the
+			-- window bounds
 			if my is_mobile() and not my is_width_only() then
 				set doc_height to 0
 
-				-- First try GUI scripting since it doesn't require JavaScript to be enabled
+				-- First try GUI scripting since it doesn't require JavaScript
+				-- to be enabled
 				my Util's gui_scripting_status()
 				repeat 10 times -- until hopefully GUI scripting succeeds
 					try
@@ -596,7 +673,7 @@ on make_safari_window() --> concrete product
 				end if
 
 				if doc_height > 0 then
-					my adjust_bottom((my _height) - doc_height)
+					my adjust_height((my _height) - doc_height)
 				else
 					my set_default_alert()
 				end if
@@ -621,7 +698,8 @@ on make_chrome_window() --> concrete product
 
 		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
-			-- Resize mobile sizes by the window content area instead of the window bounds
+			-- Resize mobile sizes by the window content area instead of the
+			-- window bounds
 			if my is_mobile() and not my is_width_only() then
 				set doc_height to 0
 				-- Google Chrome doesn't provide access to the dimensions of
@@ -635,7 +713,7 @@ on make_chrome_window() --> concrete product
 					end using terms from
 				end try
 				if doc_height > 0 then
-					my adjust_bottom((my _height) - doc_height)
+					my adjust_height((my _height) - doc_height)
 				else
 					my set_default_alert()
 				end if
@@ -655,19 +733,21 @@ end make_chrome_window
 
 		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
-			-- Resize mobile sizes by the window content area instead of the window bounds.
+			-- Resize mobile sizes by the window content area instead of the
+			-- window bounds.
 			if my is_mobile() and not my is_width_only() then
 				-- XXX: Firefox doesn't provide access to the window content
 				-- area dimensions so just use a best-guess hardcoded value
 				-- (which could become outdated with app updates or if other
 				-- toolbars are installed or hidden).
-				my adjust_bottom(102) -- tab bar + bookmarks toolbar
+				my adjust_height(102) -- tab bar + bookmarks toolbar
 			end if
 		end calculate_size
 	end script
 end make_firefox_window*)
 
--- Just an example. It works, but it's not necessary, so don't register it with the factory in the final script.
+-- Just an example. It works, but it's not necessary, so don't register it with
+-- the factory in the final script.
 (*on make_textedit_window() --> concrete product
 	script
 		property class : "TextEditWindow"
@@ -680,10 +760,10 @@ end make_firefox_window*)
 				my Util's gui_scripting_status() -- requires GUI scripting
 				tell application "System Events" to tell application process (my _app_name)
 					tell window 1's scroll area 1's text area 1
-						set h_adj to (attribute "AXSize"'s value as list)'s last item
+						set doc_height to (attribute "AXSize"'s value as list)'s last item
 					end tell
 				end tell
-				my adjust_bottom((my _height) - h_adj)
+				my adjust_height((my _height) - doc_height)
 			end if
 		end calculate_size
 	end script
@@ -696,8 +776,8 @@ script Util -- Utility Functions
 	on get_front_app_name() --> string
 		tell application "System Events"
 
-			-- Ignore (Apple)Script Editor and Terminal when getting the front app
-			-- name since most of the time they will just be used during
+			-- Ignore (Apple)Script Editor and Terminal when getting the front
+			-- app name since most of the time they will just be used during
 			-- development and testing to run the script.
 			repeat 10 times -- limit repetitions just in case
 				set frontmost_process to first process where it is frontmost
@@ -773,8 +853,9 @@ script Util -- Utility Functions
 				end tell
 			end if
 		else
-			-- In Mavericks (10.9) and later, the system should prompt the user with
-			-- instructions on granting accessibility access, so try to trigger that.
+			-- In Mavericks (10.9) and later, the system should prompt the user
+			-- with instructions on granting accessibility access, so try to
+			-- trigger that.
 			try
 				tell application "System Events"
 					tell (first process whose frontmost is true)
@@ -785,7 +866,8 @@ script Util -- Utility Functions
 					end tell
 				end tell
 			on error err_msg number err_num
-				-- In some cases, the system prompt doesn't appear, so always give some info.
+				-- In some cases, the system prompt doesn't appear, so always
+				-- give some info.
 				set msg to "Error: " & err_msg & " (" & err_num & ")"
 				if err_num is -1719 then
 					set apple_accessibility_article to "http://support.apple.com/en-us/HT202802"
