@@ -61,9 +61,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AN
 	$ egrep "^(on|script|\(\* ={4})" resize_window.applescript
 	on run -- main
 	(* ==== MVC Classes ==== *)
-	on make_controller() --> Controller
+	on make_app_controller() --> Controller
+	on make_view_controller(app_model) --> Controller
 	on make_app_window() --> Model
-	on make_ui(app_window) --> View
+	on make_ui(app_model, app_controller) --> View
 	(* ==== Factory Pattern ==== *)
 	on make_factory() --> Factory
 	on make_supported_app() --> abstract product
@@ -75,12 +76,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AN
 ********************)
 
 on run -- main
-	run make_controller() --> Controller
+	run make_app_controller() --> Controller
 end run
 
 (* ==== MVC Classes ==== *)
 
-on make_controller() --> Controller
+on make_app_controller() --> Controller
 	script
 		on run
 			set app_factory to make_factory()
@@ -91,19 +92,48 @@ on make_controller() --> Controller
 				register_product(make_webkit_window())
 			end tell
 
-			set app_window to app_factory's make_window(my Util's get_front_app_name()) --> Model
-			set ui_view to make_ui(app_window) --> View
+			set app_model to app_factory's make_window(my Util's get_front_app_name()) --> Model
+			set view_controller to make_view_controller(app_model) --> Controller
+			set app_view to make_ui(app_model, view_controller) --> View
 
-			ui_view's create_view() -- primary dialog
-			if app_window's get_new_size() is false then return -- no (more) adjustments
-			app_window's validate_window_size()
-			ui_view's which_dimensions() -- secondary dialogs
-			app_window's calculate_size()
-			app_window's resize_window()
-			if app_window's has_alert() then ui_view's display_alert()
+			app_view's create_view() -- primary dialog
+			if app_model's get_new_size() is false then return -- no (more) adjustments
+			app_view's which_dimensions() -- secondary dialogs
+			app_model's resize_window(true)
+			if app_model's has_alert() then app_view's display_alert()
 		end run
 	end script
-end make_controller
+end make_app_controller
+
+on make_view_controller(app_model) --> Controller
+	script
+		property _model : app_model -- Model
+
+		on set_new_size(size_choice) --> void
+			_model's set_new_size(size_choice)
+		end set_new_size
+
+		on set_done() --> void
+			_model's set_new_size(false)
+		end set_done
+
+		on set_width_only(true_or_false) --> void
+			_model's set_width_only(true_or_false)
+		end set_width_only
+
+		on set_subtract_mac_menu(true_or_false) --> void
+			_model's set_subtract_mac_menu(true_or_false)
+		end set_subtract_mac_menu
+
+		on increment_width_or_height(size_choice) --> void
+			_model's increment_width_or_height(size_choice)
+		end increment_width_or_height
+
+		on go_to_website() --> void
+			open location __SCRIPT_WEBSITE__ -- in default web browser
+		end go_to_website
+	end script
+end make_view_controller
 
 on make_app_window() --> Model
 	script
@@ -118,7 +148,7 @@ on make_app_window() --> Model
 		property _top : missing value -- int
 		property _bottom : missing value -- int
 
-		property _new_size : missing value -- string (or bool false)
+		property _new_size : missing value -- string (or bool false to end resizing)
 		property _new_width : missing value -- int
 		property _new_height : missing value -- int
 
@@ -129,8 +159,30 @@ on make_app_window() --> Model
 		property _alert_title : missing value -- string
 		property _alert_msg : missing value -- string
 
+		-- Preconfigured sizes (used by View to build menu):
+
+		property _mobile_sizes : paragraphs of "320x480		iPhone 4 Ñ Portrait (2x)
+480x320		iPhone 4 Ñ Landscape (2x)
+320x568		iPhone 5 Ñ Portrait (2x)
+568x320		iPhone 5 Ñ Landscape (2x)
+375x667		iPhone 6 Ñ Portrait (2x)
+667x375		iPhone 6 Ñ Landscape (2x)
+414x736		iPhone 6 Plus Ñ Portrait (3x)
+736x414		iPhone 6 Plus Ñ Landscape (3x)
+768x1024	iPad Ñ Portrait (2x)
+1024x768	iPad Ñ Landscape (2x)" -- array
+
+		property _desktop_sizes : paragraphs of "640x480		VGA (4:3)
+800x600		SVGA (4:3)
+1024x768	XGA (4:3)
+1280x800	WXGA (16:10)
+1366x768	WXGA (16:9)" -- array
+
+		(* == Public Methods == *)
+
 		on init(app_name) --> void
 			set _app_name to app_name
+			set _should_subtract_mac_menu to false -- default
 			tell application _app_name
 				set {_left, _top, _right, _bottom} to bounds of window 1
 				set _width to _right - _left
@@ -138,19 +190,52 @@ on make_app_window() --> Model
 			end tell
 		end init
 
-		on resize_window() --> void
+		on resize_window(should_calculate) --> void
+			if should_calculate then calculate_size()
 			tell application _app_name
 				set bounds of window 1 to {_left, _top, _right, _bottom}
 			end tell
 			return {_left, _top, _right, _bottom}
 		end resize_window
 
-		on validate_window_size() --> void
-			local msg, txt
+		-- This method is overridden by subclasses to get custom behavior
+		on calculate_size() --> void
+			set_right(_left + _new_width)
+			if not _is_width_only then
+				set_bottom(_top + _new_height)
+				if _should_subtract_mac_menu then
+					adjust_bottom(-_mac_menu_bar)
+				end if
+			end if
+		end calculate_size
+
+		-- @param string Examples: "width + 10" or "height - 20px" ('px' is optional)
+		on increment_width_or_height(size_choice) --> void
+			set {width_or_height, _sign, _amount} to my Util's split_text(size_choice, space)
+			if _amount ends with "px" then set _amount to text 1 thru -3 of _amount as integer
+			set size_adjustment to _sign & _amount as integer
+			ignoring case
+				if width_or_height is "Width" then
+					adjust_right(size_adjustment)
+				else
+					adjust_bottom(size_adjustment)
+				end if
+			end ignoring
+			resize_window(false) -- false = don't calculate new size; already calculated
+			set _new_size to false -- to prevent further resizing
+		end increment_width_or_height
+
+		on has_alert() --> boolean
+			_alert_title is not missing value and _alert_msg is not missing value
+		end has_alert
+
+		(* == Private Methods == *)
+
+		on _parse_window_size(new_size) --> void -- PRIVATE
 			set msg to "Window size should be formatted as WIDTHxHEIGHT (separated by a lowercase \"x\")."
 
 			try
-				set _new_size to my Util's split_text(_new_size, tab)'s first item
+				set _new_size to my Util's split_text(new_size, tab)'s first item
 				set {_new_width, _new_height} to my Util's split_text(_new_size, "x")
 			on error
 				set txt to "Invalid window size"
@@ -170,28 +255,27 @@ on make_app_window() --> Model
 				set msg to "Width and height must be integers."
 				my Util's error_with_alert(txt, msg)
 			end try
-		end validate_window_size
+		end _parse_window_size
 
-		on calculate_size() --> void
-			set_right(_left + _new_width)
-			if not _is_width_only then
-				set_bottom(_top + _new_height)
-				if _should_subtract_mac_menu then
-					adjust_bottom(-_mac_menu_bar)
-				end if
-			end if
-		end calculate_size
+		on _set_mobile(true_or_false) --> void -- PRIVATE
+			my Util's validate_boolean_arg(true_or_false, "_set_mobile")
 
-		on has_alert() --> boolean
-			_alert_title is not missing value and _alert_msg is not missing value
-		end has_alert
+			-- Only supported apps can target the window body for mobile sizes.
+			-- Those supported apps will have a different class name than the
+			-- generic fallback "AppWindow".
+			set _is_mobile to (my class is not "AppWindow" and true_or_false) --> boolean
+		end _set_mobile
 
 		(* == Setters == *)
 
-		on set_mobile(true_or_false) --> void
-			my Util's validate_boolean_arg(true_or_false, "set_mobile")
-			set _is_mobile to true_or_false
-		end set_mobile
+		on set_new_size(new_size) --> void
+			if new_size is false then
+				set _new_size to false
+				return
+			end if
+			_set_mobile(new_size is in _mobile_sizes) -- boolean arg
+			_parse_window_size(new_size) -- sets {_new_size, _new_width, _new_height}
+		end set_new_size
 
 		on set_width_only(true_or_false) --> void
 			my Util's validate_boolean_arg(true_or_false, "set_width_only")
@@ -202,10 +286,6 @@ on make_app_window() --> Model
 			my Util's validate_boolean_arg(true_or_false, "set_subtract_mac_menu")
 			set _should_subtract_mac_menu to true_or_false
 		end set_subtract_mac_menu
-
-		on set_new_size(new_size) --> void
-			set _new_size to new_size
-		end set_new_size
 
 		on set_right(val) --> void
 			set _right to val
@@ -279,9 +359,10 @@ on make_app_window() --> Model
 	end script
 end make_app_window
 
-on make_ui(app_window) --> View
+on make_ui(app_model, app_controller) --> View
 	script
-		property _app_window : app_window -- Model
+		property _model : app_model -- Model
+		property _controller : app_controller -- Controller
 		property _size_choice : missing value -- string
 
 		(* == View Components == *)
@@ -289,31 +370,15 @@ on make_ui(app_window) --> View
 		property _dialog_title : __SCRIPT_NAME__
 		property _custom_choice : "Custom sizeÉ"
 		property _u_dash : Çdata utxt2500È as Unicode text -- BOX DRAWINGS LIGHT HORIZONTAL
-		property _menu_rule : my Util's multiply_text(_u_dash, 21)
+		property _menu_rule : my Util's multiply_text(_u_dash, 21) -- string
 
 		property _width_increments : {"Width + 1px", "Width - 1px", "Width + 10px", "Width - 10px"}
 		property _height_increments : {"Height + 1px", "Height - 1px", "Height + 10px", "Height - 10px"}
 
-		property _mobile_sizes : paragraphs of "320x480		iPhone 4 Ñ Portrait (2x)
-480x320		iPhone 4 Ñ Landscape (2x)
-320x568		iPhone 5 Ñ Portrait (2x)
-568x320		iPhone 5 Ñ Landscape (2x)
-375x667		iPhone 6 Ñ Portrait (2x)
-667x375		iPhone 6 Ñ Landscape (2x)
-414x736		iPhone 6 Plus Ñ Portrait (3x)
-736x414		iPhone 6 Plus Ñ Landscape (3x)
-768x1024	iPad Ñ Portrait (2x)
-1024x768	iPad Ñ Landscape (2x)"
-
-		property _desktop_sizes : paragraphs of "640x480		VGA (4:3)
-800x600		SVGA (4:3)
-1024x768	XGA (4:3)
-1280x800	WXGA (16:10)
-1366x768	WXGA (16:9)"
-
-		property _size_list : _mobile_sizes & Â
+		-- main dialog menu
+		property _menu : _model's _mobile_sizes & Â
 			_menu_rule & Â
-			_desktop_sizes & Â
+			_model's _desktop_sizes & Â
 			_menu_rule & Â
 			_width_increments & Â
 			_menu_rule & Â
@@ -321,108 +386,91 @@ on make_ui(app_window) --> View
 			_menu_rule & Â
 			_custom_choice & Â
 			_menu_rule & Â
-			("About " & __SCRIPT_NAME__)
+			("About " & __SCRIPT_NAME__) -- array
 
 		(* == View Methods == *)
 
 		on create_view() --> void
 			local m
-			tell _app_window
+			tell _model
 				set m to "Choose a size for " & get_name() & "'s front window" & return & "(currently " & get_width() & "x" & get_height() & "):"
 			end tell
 			repeat -- until a horizontal rule is not selected
-				set _size_choice to choose from list _size_list default items {_size_list's item 14} with title _dialog_title with prompt m
-				if _size_choice as string is not _menu_rule then
+				set action_event to choose from list _menu default items {_menu's item 14} with title _dialog_title with prompt m
+				if action_event as string is not _menu_rule then
 					exit repeat
 				else
 					display alert "Invalid selection" message "Try again." as warning
 				end if
 			end repeat
-			if _size_choice is false then error number -128 -- User canceled
-			set _size_choice to _size_choice as string
-
-			-- Only supported apps can target the window body for mobile sizes.
-			-- Those supported apps will have a different class name than the
-			-- generic fallback "AppWindow".
-			if _app_window's class is not "AppWindow" and _size_choice is in _mobile_sizes then
-				_app_window's set_mobile(true)
-			else
-				_app_window's set_mobile(false)
-			end if
-
-			_handle_user_action()
-			_app_window's set_new_size(_size_choice)
+			_action_performed(action_event)
 		end create_view
 
-		on display_alert() --> void
-			set t to _dialog_title & ": " & _app_window's get_alert_title()
-			tell application (_app_window's get_name())
-				display alert t message _app_window's get_alert_msg() as warning
-			end tell
-		end display_alert
-
 		on which_dimensions() --> void
-			local dimension_choice, mac_menu_choice, m, b
-			tell _app_window
+			tell _model
 				set m to "Resize both the window's width and height (" & get_new_width() & "x" & get_new_height() & ") or just the width (" & get_new_width() & ")?"
 			end tell
 			set b to {"Cancel", "Width & Height", "Width-only"}
 			display dialog m with title _dialog_title buttons b default button 3
 			set dimension_choice to button returned of result
-			if dimension_choice is b's item 3 then
-				--_app_window's set_width_only("DEBUG: not a boolean") -- DEBUG: throw error
-				_app_window's set_width_only(true)
-			else
-				_app_window's set_width_only(false)
-			end if
+			_controller's set_width_only(dimension_choice is b's item 3) -- boolean arg
 
-			_app_window's set_subtract_mac_menu(false)
-			if not _app_window's is_width_only() and not _app_window's is_mobile() then
-				set m to "Subtract Mac Menu Bar height (" & _app_window's get_mac_menu_bar() & "px)?"
+			if not _model's is_width_only() and not _model's is_mobile() then
+				set m to "Subtract Mac Menu Bar height (" & _model's get_mac_menu_bar() & "px)?"
 				set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
 				display dialog m with title _dialog_title buttons b default button 3
 				set mac_menu_choice to button returned of result
-				if mac_menu_choice is b's item 2 then
-					_app_window's set_subtract_mac_menu(true)
-				end if
+				_controller's set_subtract_mac_menu(mac_menu_choice is b's item 2) -- boolean arg
 			end if
 		end which_dimensions
 
-		on _handle_user_action() --> void -- PRIVATE
-			local t, b, m, btn_choice
-			local width_or_height, _sign, _amount, size_adjustment
-			if _size_choice is _size_list's last item then
-				set t to __SCRIPT_NAME__
-				set b to {"License", "Website", "OK"}
-				set m to Â
-					"Resize the front window of any application." & return & return Â
-					& "Version " & __SCRIPT_VERSION__ & return & return & return & return Â
-					& __SCRIPT_COPYRIGHT__ & return & return Â
-					& __SCRIPT_LICENSE_SUMMARY__ & return
-				display alert t message m buttons b default button 3
-				set btn_choice to button returned of result
-				if btn_choice is b's item 1 then
-					display alert t message __SCRIPT_LICENSE__
-				else if btn_choice is b's item 2 then
-					open location __SCRIPT_WEBSITE__
-				end if
-				set _size_choice to false
-			else if _size_choice is _custom_choice then
-				set m to "Type in a custom width and height separated by an \"x\":"
-				display dialog m with title _dialog_title default answer "1024x768"
-				set _size_choice to text returned of result
-			else if _size_choice is in _width_increments & _height_increments then
-				set {width_or_height, _sign, _amount} to my Util's split_text(characters 1 thru -3 of _size_choice as string, space)
-				set size_adjustment to _sign & _amount as integer
-				if width_or_height is "Width" then
-					_app_window's adjust_right(size_adjustment)
-				else
-					_app_window's adjust_bottom(size_adjustment)
-				end if
-				_app_window's resize_window()
-				set _size_choice to false
+		on display_alert() --> void
+			set t to _dialog_title & ": " & _model's get_alert_title()
+			tell application (_model's get_name())
+				display alert t message _model's get_alert_msg() as warning
+			end tell
+		end display_alert
+
+		(* == PRIVATE == *)
+
+		on _action_performed(action_event) --> void -- PRIVATE
+			if action_event is false then error number -128 -- User canceled
+			set action_event to action_event as string
+
+			if action_event is _menu's last item then
+				_display_about()
+			else if action_event is _custom_choice then
+				_prompt_custom()
+			else if action_event is in _width_increments & _height_increments then
+				_controller's increment_width_or_height(action_event)
+			else
+				_controller's set_new_size(action_event)
 			end if
-		end _handle_user_action
+		end _action_performed
+
+		on _display_about() --> void -- PRIVATE
+			set t to __SCRIPT_NAME__
+			set b to {"License", "Website", "OK"}
+			set m to Â
+				"Resize the front window of any application." & return & return Â
+				& "Version " & __SCRIPT_VERSION__ & return & return & return & return Â
+				& __SCRIPT_COPYRIGHT__ & return & return Â
+				& __SCRIPT_LICENSE_SUMMARY__ & return
+			display alert t message m buttons b default button 3
+			set btn_choice to button returned of result
+			if btn_choice is b's item 1 then
+				display alert t message __SCRIPT_LICENSE__
+			else if btn_choice is b's item 2 then
+				_controller's go_to_website()
+			end if
+			_controller's set_done()
+		end _display_about
+
+		on _prompt_custom() --> void -- PRIVATE
+			set m to "Type in a custom width and height separated by an \"x\":"
+			display dialog m with title _dialog_title default answer "1024x768"
+			_controller's set_new_size(text returned of result) -- model will parse/validate input
+		end _prompt_custom
 	end script
 end make_ui
 
@@ -466,7 +514,7 @@ on make_supported_app() --> abstract product
 			return my short_name
 		end to_string
 
-		on reset_gui(app_process)
+		on reset_gui(app_process) --> void
 			using terms from application "System Events"
 				tell app_process
 					-- XXX: Release any keys that may have been used to invoke
@@ -492,13 +540,13 @@ on make_supported_app() --> abstract product
 			end using terms from
 		end reset_gui
 
-		on set_default_alert()
+		on set_default_alert() --> void
 			set t to "Couldn't target window content area for resizing"
 			set m to "The height of the content area of the window could not be resized to the selected mobile dimensions, so the overall window frame height was resized instead." & return & return & "Try enabling JavaScript if it's not already enabled and rerun the script."
 			set_alert(t, m)
 		end set_default_alert
 
-		on set_alert(this_title, this_msg)
+		on set_alert(this_title, this_msg) --> void
 			my set_alert_title(this_title)
 			my set_alert_msg(this_msg)
 		end set_alert
@@ -511,7 +559,7 @@ on make_safari_window() --> concrete product
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Safari"
 
-		on calculate_size()
+		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my is_mobile() and not my is_width_only() then
@@ -571,7 +619,7 @@ on make_chrome_window() --> concrete product
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Chrome"
 
-		on calculate_size()
+		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds
 			if my is_mobile() and not my is_width_only() then
@@ -605,7 +653,7 @@ end make_chrome_window
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "Firefox"
 
-		on calculate_size()
+		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
 			-- Resize mobile sizes by the window content area instead of the window bounds.
 			if my is_mobile() and not my is_width_only() then
@@ -626,7 +674,7 @@ end make_firefox_window*)
 		property parent : make_supported_app() -- extends SupportedApp
 		property short_name : "TextEdit"
 
-		on calculate_size()
+		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
 			if my is_mobile() and not my is_width_only() then
 				my Util's gui_scripting_status() -- requires GUI scripting
@@ -676,7 +724,7 @@ script Util -- Utility Functions
 		error number -128 -- User canceled
 	end error_with_alert
 
-	on validate_boolean_arg(boolean_arg, func_name)
+	on validate_boolean_arg(boolean_arg, func_name) --> void
 		try
 			boolean_arg as boolean
 		on error err_msg number err_num
@@ -705,10 +753,7 @@ script Util -- Utility Functions
 		end try
 	end split_text
 
-	on gui_scripting_status()
-		local os_ver, is_before_mavericks, ui_enabled, apple_accessibility_article
-		local err_msg, err_num, msg, t, b
-
+	on gui_scripting_status() --> void
 		set os_ver to system version of (system info)
 
 		considering numeric strings -- version strings
@@ -757,4 +802,3 @@ script Util -- Utility Functions
 		end if
 	end gui_scripting_status
 end script
-
