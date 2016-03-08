@@ -202,6 +202,7 @@ on make_app_window() --> Model
 
 		property _is_width_only : missing value -- boolean
 		property _should_subtract_mac_menu : missing value -- boolean
+		property _should_prompt_mac_menu : missing value -- boolean
 		property _is_mobile : missing value -- boolean
 
 		property _alert_title : missing value -- string
@@ -231,12 +232,14 @@ on make_app_window() --> Model
 		-- @param[in] string The name of the target (frontmost) application
 		-- @param[out] string _app_name Same as input parameter
 		-- @param[out] boolean _should_subtract_mac_menu Initialized to false
+		-- @param[out] boolean _should_prompt_mac_menu Initialized to true
 		-- @param[out] int _left,_top,_right,_bottom Current window bounds
 		-- @param[out] int _width,_height Current window dimensions
 		-- @return Nothing
 		on init(app_name) --> void
 			set _app_name to app_name
 			set _should_subtract_mac_menu to false -- default
+			set _should_prompt_mac_menu to true -- default
 			tell application _app_name
 				set {_left, _top, _right, _bottom} to bounds of window 1
 				set _width to _right - _left
@@ -276,30 +279,61 @@ on make_app_window() --> Model
 		-- @param[out] int    _new_height
 		-- @return Nothing
 		on _parse_window_size(new_size) --> void -- PRIVATE
-			set msg to "Window size should be formatted as WIDTHxHEIGHT (integers separated by an \"x\")."
+			set msg to "Window size should be formatted as WIDTHxHEIGHT (integers separated by an \"x\"). The width and/or height can also be prefixed with a +/- to add/subtract the associated value."
 
+			-- Parse size, width, and height from string
 			try
-				set _new_size to my Util's split_text(new_size, tab)'s first item -- get size string
-				set _new_size to my Util's split_text(_new_size, space) as string -- delete spaces
-				set {_new_width, _new_height} to my Util's split_text(_new_size, "x")
+				set size_arg to my Util's split_text(new_size, tab)'s first item -- get size string
+				set size_arg to my Util's split_text(size_arg, space) as string -- delete spaces
+				set {width_arg, height_arg} to my Util's split_text(size_arg, "x")
 			on error
-				set txt to "Invalid window size"
-				my Util's error_with_alert(txt, msg)
+				set err_title to "Invalid window size"
+				my Util's error_with_alert(err_title, msg)
 			end try
 
-			if _new_width is "" or _new_height is "" then
-				set txt to "Invalid width and/or height"
-				my Util's error_with_alert(txt, msg)
+			if width_arg is "" or height_arg is "" then
+				set err_title to "Missing width and/or height"
+				my Util's error_with_alert(err_title, msg)
 			end if
 
+			-- Check for increment/decrement args
+			set {width_sign, height_sign} to {missing value, missing value}
 			try
-				_new_width as integer
-				_new_height as integer
+				if character 1 of width_arg is in {"+", "-"} then
+					set {width_sign, width_arg} to {width_arg's text 1, width_arg's text 2 thru -1}
+				end if
+				if character 1 of height_arg is in {"+", "-"} then
+					set {height_sign, height_arg} to {height_arg's text 1, height_arg's text 2 thru -1}
+				end if
 			on error
-				set txt to "Invalid width and/or height"
-				set msg to "Width and height must be integers."
-				my Util's error_with_alert(txt, msg)
+				set err_title to "Invalid width and/or height"
+				set msg to "Width and height must be integers, optionally prefixed with +/- (to add/subtract)."
+				my Util's error_with_alert(err_title, msg)
 			end try
+
+			-- Validate integer args
+			try
+				width_arg as integer
+				height_arg as integer
+			on error
+				set err_title to "Invalid width and/or height"
+				set msg to "Width and height must be integers, optionally prefixed with +/- (to add/subtract)."
+				my Util's error_with_alert(err_title, msg)
+			end try
+
+			-- Set new values from parsed/validated args
+			if width_sign is missing value then
+				set _new_width to width_arg as integer
+			else
+				set _new_width to _width + (width_sign & width_arg as integer)
+			end if
+			if height_sign is missing value then
+				set _new_height to height_arg as integer
+			else
+				set _new_height to _height + (height_sign & height_arg as integer)
+				set _should_prompt_mac_menu to false
+			end if
+			set _new_size to _new_width & "x" & _new_height as string
 		end _parse_window_size
 
 		on _set_mobile(true_or_false) --> void -- PRIVATE
@@ -313,7 +347,12 @@ on make_app_window() --> Model
 
 		(* == Setters == *)
 
-		-- @param string|boolean Description of chosen size (or 'false'); to be parsed
+		-- @param[in]  string|boolean Description of chosen size (or 'false'); to be parsed
+		-- @param[out] boolean _is_mobile
+		-- @param[out] string|boolean _new_size Formatted size, e.g., "1024x768" (or 'false')
+		-- @param[out] int    _new_width
+		-- @param[out] int    _new_height
+		-- @return Nothing
 		on set_new_size(new_size) --> void
 			if new_size is false then
 				set _new_size to false
@@ -378,6 +417,10 @@ on make_app_window() --> Model
 		on is_width_only() --> boolean
 			return _is_width_only
 		end is_width_only
+
+		on should_prompt_mac_menu() --> boolean
+			return _should_prompt_mac_menu
+		end should_prompt_mac_menu
 
 		on get_name() --> string
 			return _app_name
@@ -470,7 +513,7 @@ on make_ui(app_model, app_controller) --> View
 			set dimension_choice to button returned of result
 			_controller's set_width_only(dimension_choice is b's item 3) -- boolean arg
 
-			if not _model's is_width_only() and not _model's is_mobile() then
+			if not _model's is_width_only() and not _model's is_mobile() and _model's should_prompt_mac_menu() then
 				set m to "Subtract Mac menu bar height (" & _model's get_mac_menu_bar() & "px)?"
 				set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
 				display dialog m with title _dialog_title buttons b default button 3
@@ -525,7 +568,7 @@ on make_ui(app_model, app_controller) --> View
 			set bp to "Any number can be prefixed with \"+\" or \"-\" to add or subtract that amount instead of setting a specific size."
 
 			if action_event is _custom_options's item 1 then
-				set m to "Enter a custom width and height separated by an \"x\". The current window size is prefilled by default." --& return & return & bp
+				set m to "Enter a custom width and height separated by an \"x\". The current window size is prefilled by default." & return & return & bp
 				set a to _model's get_width() & "x" & _model's get_height() as string
 			else if action_event is _custom_options's item 2 then
 				set m to "Enter a custom width. The current window width is prefilled by default." & return & return & bp
@@ -799,8 +842,8 @@ script Util -- Utility Functions
 		return current_app
 	end get_front_app_name
 
-	on error_with_alert(txt, msg) --> void
-		display alert txt message msg as critical buttons {"Cancel"} default button 1
+	on error_with_alert(err_title, msg) --> void
+		display alert err_title message msg as critical buttons {"Cancel"} default button 1
 		error number -128 -- User canceled
 	end error_with_alert
 
