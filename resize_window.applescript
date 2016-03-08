@@ -164,17 +164,24 @@ on make_view_controller(app_model) --> Controller
 		-- @param 1 string The dimension to change -- "width" or "height"
 		-- @param 2 string Exact or incremental value, i.e., unsigned or signed integer, respectively.
 		on _set_width_or_height(width_or_height, val) --> void -- PRIVATE
+			try
+				set int_val to val as integer
+			on error
+				set err_title to "Invalid input"
+				set msg to "Input must be an integer, optionally prefixed with +/- (to add/subtract)."
+				my Util's error_with_alert(err_title, msg)
+			end try
 			if first character of val is in {"+", "-"} then -- increment/decrement the size
 				if width_or_height is "width" then
-					_model's adjust_width(val as integer)
+					_model's adjust_width(int_val)
 				else
-					_model's adjust_height(val as integer)
+					_model's adjust_height(int_val)
 				end if
 			else -- exact size
 				if width_or_height is "width" then
-					_model's set_width(val as integer)
+					_model's set_width(int_val)
 				else
-					_model's set_height(val as integer)
+					_model's set_height(int_val)
 				end if
 			end if
 			_model's resize_window(false) -- false = don't calculate new size; already calculated
