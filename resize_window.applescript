@@ -188,6 +188,7 @@ on make_app_window() --> Model
 		property class : "AppWindow" -- superclass
 		property _app_name : missing value -- string
 		property _mac_menu_bar : 23 -- int (22px menu plus 1px bottom border)
+		property _supported_apps : missing value -- array
 
 		property _width : missing value -- int
 		property _height : missing value -- int
@@ -347,6 +348,11 @@ on make_app_window() --> Model
 
 		(* == Setters == *)
 
+		-- @param array
+		on set_supported_apps(app_names) --> void
+			set _supported_apps to app_names
+		end set_supported_apps
+
 		-- @param[in]  string|boolean Description of chosen size (or 'false'); to be parsed
 		-- @param[out] boolean _is_mobile
 		-- @param[out] string|boolean _new_size Formatted size, e.g., "1024x768" (or 'false')
@@ -405,6 +411,14 @@ on make_app_window() --> Model
 		end set_alert_msg
 
 		(* == Getters == *)
+
+		on get_supported_apps() --> array
+			return _supported_apps
+		end get_supported_apps
+
+		on get_supported_apps_as_string() --> string
+			my Util's join_list(_supported_apps, ", ")
+		end get_supported_apps_as_string
 
 		on get_new_size() --> string (or bool false)
 			return _new_size
@@ -483,7 +497,7 @@ on make_ui(app_model, app_controller) --> View
 			_menu_rule & Â
 			_custom_options & Â
 			_menu_rule & Â
-			("About " & __SCRIPT_NAME__) -- array
+			("About" & space & __SCRIPT_NAME__) -- array
 
 		(* == View Methods == *)
 
@@ -547,22 +561,43 @@ on make_ui(app_model, app_controller) --> View
 		end _action_performed
 
 		on _display_about() --> void -- PRIVATE
+			_controller's set_done() -- no window resizing
 			set t to __SCRIPT_NAME__
-			set b to {"License", "Website", "OK"}
+			set b to {"License", "Help", "OK"}
 			set m to Â
 				"Resize the front window of any application." & return & return Â
 				& "Version " & __SCRIPT_VERSION__ & return & return & return & return Â
 				& __SCRIPT_COPYRIGHT__ & return & return Â
 				& __SCRIPT_LICENSE_SUMMARY__ & return
-			display alert t message m buttons b default button 3
+			with timeout of (10 * 60) seconds
+				display alert t message m buttons b default button 3
+			end timeout
 			set btn_choice to button returned of result
 			if btn_choice is b's item 1 then
-				display alert t message __SCRIPT_LICENSE__
+				with timeout of (10 * 60) seconds
+					display alert t message __SCRIPT_LICENSE__
+				end timeout
 			else if btn_choice is b's item 2 then
+				_display_help()
+			end if
+		end _display_about
+
+		on _display_help() --> void -- PRIVATE
+			set t to __SCRIPT_NAME__ & space & "Help"
+			set b to {"Website", "OK"}
+			set m to "Resize Window can resize the frontmost window of any application (except Script Editor and Terminal which are excluded since they are often used to run scripts during development)." & return & return Â
+				& "The first group of options is for preconfigured mobile sizes. Windows for supported apps (" & _model's get_supported_apps_as_string() & ") will be resized by the window content area. For all other apps, the overall window frame will be resized to match the selected size. In all cases, you can choose to resize just the width without resizing the height." & return & return Â
+				& "The second group of options is for preconfigured desktop sizes. The overall window frame is resized to match those dimensions with the option to subtract the height of the Mac menu bar (23px). Like the mobile sizes, you will also be presented with the option to only resize the width without resizing the height." & return & return Â
+				& "The next two groups of options are for incrementing or decrementing either the window width or window height by 1px or 10px." & return & return Â
+				& "The final group of options is for entering custom values. Select \"Custom Size\" to enter custom values for both width and height. The other two options are for entering a custom value for just the width or just the height. For all three custom options, a \"+\" or \"-\" sign can be prefixed to any integer in order to add or subtract that amount instead of setting an exact value." & return
+			with timeout of (10 * 60) seconds
+				display alert t message m buttons b default button 2
+			end timeout
+			set btn_choice to button returned of result
+			if btn_choice is b's item 1 then
 				_controller's go_to_website()
 			end if
-			_controller's set_done()
-		end _display_about
+		end _display_help
 
 		on _prompt_custom(action_event) --> void -- PRIVATE
 			set bp to "Any number can be prefixed with \"+\" or \"-\" to add or subtract that amount instead of setting a specific size."
@@ -604,17 +639,29 @@ on make_factory() --> Factory
 		end register_product
 
 		on make_window(app_name) --> AppWindow
+			set this_app to missing value
 			repeat with this_product in _registered_products
 				if app_name is this_product's to_string() then
-					this_product's init(app_name)
-					return this_product
+					set this_app to this_product
+					exit repeat
 				end if
 			end repeat
-			-- fallback to generic app window w/o inner dimension support
-			set this_app to make_app_window() --> AppWindow superclass (Model)
+			if this_app is missing value then
+				-- fallback to generic app window w/o inner dimension support
+				set this_app to make_app_window() --> AppWindow superclass (Model)
+			end if
 			this_app's init(app_name)
+			this_app's set_supported_apps(_get_app_names())
 			return this_app
 		end make_window
+
+		on _get_app_names() --> array -- PRIVATE
+			set app_names to {}
+			repeat with this_product in _registered_products
+				set end of app_names to this_product's to_string()
+			end repeat
+			return app_names
+		end _get_app_names
 	end script
 end make_factory
 
@@ -865,16 +912,30 @@ script Util -- Utility Functions
 	end multiply_text
 
 	on split_text(txt, delim) --> array
+		set old_tids to AppleScript's text item delimiters
 		try
 			set AppleScript's text item delimiters to (delim as string)
 			set lst to every text item of (txt as string)
-			set AppleScript's text item delimiters to ""
+			set AppleScript's text item delimiters to old_tids
 			return lst
 		on error err_msg number err_num
-			set AppleScript's text item delimiters to ""
-			error "Can't split_text: " & err_msg number err_num
+			set AppleScript's text item delimiters to old_tids
+			error "Can't split_text(): " & err_msg number err_num
 		end try
 	end split_text
+
+	on join_list(lst, delim)
+		set old_tids to AppleScript's text item delimiters
+		try
+			set AppleScript's text item delimiters to (delim as string)
+			set txt to lst as string
+			set AppleScript's text item delimiters to old_tids
+			return txt
+		on error err_msg number err_num
+			set AppleScript's text item delimiters to old_tids
+			error "Can't join_list(): " & err_msg number err_num
+		end try
+	end join_list
 
 	on gui_scripting_status() --> void
 		set os_ver to system version of (system info)
