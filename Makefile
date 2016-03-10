@@ -159,8 +159,15 @@ $(DOC_TARGET): $(HTML_FILE)
 	@$(ED) $(DOC_TARGET)/TXT.rtf < $(ED_COMMANDS) >/dev/null 2>&1
 	@touch -r "$(DOC_DIR)/readme.md" "$@"
 	@touch -r "$(DOC_DIR)/readme.md" $(DOC_TARGET)/TXT.rtf
+	@echo "--->  Deleting temporary scaled images..."
+	@$(RM) "$(BUILD)/img"
 
 $(HTML_FILE): $(DOC_SRC)
+	@echo "--->  Scaling images to fit RTF document..."
+	@[ -d $(BUILD)/img ] || $(MKDIR) $(BUILD)/img
+	@for f in $(DOC_DIR)/img/*.png; do \
+		sips --resampleWidth 640 $$f --out $(BUILD)/img >/dev/null 2>&1; \
+	done
 	@echo "--->  Concatenating Markdown files and generating temp HTML file..."
 	@if ! which $(MARKDOWN) >/dev/null; then \
 		echo "Can't find '$(MARKDOWN)' in PATH, needed for Markdown to HTML."; \
