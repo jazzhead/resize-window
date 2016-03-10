@@ -22,37 +22,45 @@ websites that adapt to different sizes.
 Features
 --------
 
-* Select from a list of common web browser window sizes.
-* Increment the width or height plus or minus 1 pixel or 10 pixels.
-* Type in a custom width and height.
+* Select from a list of common web browser window sizes, both mobile and
+  desktop.
+
+* For the preconfigured mobile sizes, windows for supported apps (Safari and
+  Google Chrome) will be resized by the inner window content area. For desktop
+  sizes and all other apps, the overall window frame is resized to the selected
+  dimensions.
+
 * Choose to adjust only the width or both the width and the height.
+
 * When adjusting the height, choose whether or not to subtract the OS X menu
   bar height.
 
-<!--
-The following horizontal rule is a kludge to get a paragraph space in the RTF
-file. It is replaced with just an empty paragraph, not an RTF horizontal rule.
--->
+* Increment the width or height plus or minus 1 pixel or 10 pixels.
 
----
+* Increment/decrement the width, height, or both by custom values.
 
-_Note: The sizes refer to the overall size of the window and not the interior
-document size minus the window chrome. So the smaller sizes are mostly useful
-for just testing the width for mobile devices. A few FPO images are included
-along with the script though for loading into a browser window and quickly
-eyeballing the fit and manually adjusting the window height._
+* Specify a custom width and/or height.
 
 
 Screen Shots
 ------------
 
-  ![Initial dialog](img/dialog-1-s.png "Screenshot of initial dialog")
+Resize windows by preconfigured mobile sizes:
 
-  ![Resize dialog](img/dialog-2-s.png "Screenshot of resize choice dialog")
+  ![Mobile sizes](../_build/img/mobile-sizes.png "Mobile sizes screen shot")
 
-  ![Menu bar dialog](img/dialog-3-s.png "Screenshot of menu bar dialog")
+Resize windows by preconfigured desktop sizes:
 
-  ![Custom size dialog](img/dialog-4-s.png "Screenshot of custom size dialog")
+  ![Desktop sizes](../_build/img/desktop-sizes.png "Desktop sizes screen shot")
+
+Resize windows by custom sizes:
+
+  ![Custom size](../_build/img/custom-size.png "Custom size screen shot")
+
+Resize windows by custom widths, heights, or increments (custom width increment
+shown here):
+
+  ![Custom width](../_build/img/custom-width.png "Custom width screen shot")
 
 
 Installation
@@ -83,7 +91,20 @@ version of Mac OS X you're running. For Snow Leopard (10.6) and later, it is a
 preference setting in the Script Editor app called "Show Script menu in menu
 bar":
 
-  ![Script menu setting](img/scriptmenu-s.png "Screenshot of Script menu setting")
+  ![Script menu setting](img/common/scriptmenu-s.png "Screen shot of Script menu setting")
+
+
+Development
+-----------
+
+This script is written using object-oriented design patterns including
+Model-View-Controller (MVC) and the Factory Pattern. A Makefile is used to
+compile the script and generate the documentation. The [source code][] is
+available on GitHub.
+
+  ![Source code](../_build/img/dev-source.png "Source code screen shot")
+
+  [source code]: https://github.com/jazzhead/resize-window
 
 
 Bugs
