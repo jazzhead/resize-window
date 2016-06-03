@@ -481,7 +481,9 @@ on make_ui(app_model, app_controller) --> View
 	script
 		property _model : app_model -- Model
 		property _controller : app_controller -- Controller
+
 		property _size_choice : missing value -- string
+		property _app_name : app_model's get_name() -- string
 
 		(* == View Components == *)
 
@@ -513,12 +515,18 @@ on make_ui(app_model, app_controller) --> View
 			tell _model
 				set m to "Choose a size for " & get_name() & "'s front window" & return & "(currently " & get_width() & "x" & get_height() & "):"
 			end tell
+			tell application _app_name to activate
 			repeat -- until a horizontal rule is not selected
-				set action_event to choose from list _menu default items {_menu's item 14} with title _dialog_title with prompt m
+				tell application _app_name
+					choose from list _menu default items {_menu's item 14} with title _dialog_title with prompt m
+				end tell
+				set action_event to result
 				if action_event as string is not _menu_rule then
 					exit repeat
 				else
-					display alert "Invalid selection" message "Try again." as warning
+					tell application _app_name
+						display alert "Invalid selection" message "Try again." as warning
+					end tell
 				end if
 			end repeat
 			_action_performed(action_event)
@@ -530,14 +538,18 @@ on make_ui(app_model, app_controller) --> View
 				set m to "Resize both the window's width and height (" & get_new_width() & "x" & get_new_height() & ") or just the width (" & get_new_width() & ")?"
 			end tell
 			set b to {"Cancel", "Width & Height", "Width-only"}
-			display dialog m with title _dialog_title buttons b default button 3
+			tell application _app_name
+				display dialog m with title _dialog_title buttons b default button 3
+			end tell
 			set dimension_choice to button returned of result
 			_controller's set_width_only(dimension_choice is b's item 3) -- boolean arg
 
 			if not _model's is_width_only() and not _model's is_mobile() and _model's should_prompt_mac_menu() then
 				set m to "Subtract Mac menu bar height (" & _model's get_mac_menu_bar() & "px)?"
 				set b to {"Cancel", "Subtract Mac Menu Bar", "Don't Subtract"}
-				display dialog m with title _dialog_title buttons b default button 3
+				tell application _app_name
+					display dialog m with title _dialog_title buttons b default button 3
+				end tell
 				set mac_menu_choice to button returned of result
 				_controller's set_subtract_mac_menu(mac_menu_choice is b's item 2) -- boolean arg
 			end if
@@ -545,7 +557,7 @@ on make_ui(app_model, app_controller) --> View
 
 		on display_alert() --> void
 			set t to _dialog_title & ": " & _model's get_alert_title()
-			tell application (_model's get_name())
+			tell application _app_name
 				display alert t message _model's get_alert_msg() as warning
 			end tell
 		end display_alert
@@ -577,12 +589,16 @@ on make_ui(app_model, app_controller) --> View
 				& __SCRIPT_COPYRIGHT__ & return & return Â
 				& __SCRIPT_LICENSE_SUMMARY__ & return
 			with timeout of (10 * 60) seconds
-				display alert t message m buttons b default button 3
+				tell application _app_name
+					display alert t message m buttons b default button 3
+				end tell
 			end timeout
 			set btn_choice to button returned of result
 			if btn_choice is b's item 1 then
 				with timeout of (10 * 60) seconds
-					display alert t message __SCRIPT_LICENSE__
+					tell application _app_name
+						display alert t message __SCRIPT_LICENSE__
+					end tell
 				end timeout
 			else if btn_choice is b's item 2 then
 				_display_help()
@@ -598,7 +614,9 @@ on make_ui(app_model, app_controller) --> View
 				& "The next two groups of options are for incrementing or decrementing either the window width or window height by 1px or 10px." & return & return Â
 				& "The final group of options is for entering custom values. Select \"Custom Size\" to enter custom values for both width and height. The other two options are for entering a custom value for just the width or just the height. For all three custom options, a \"+\" or \"-\" sign can be prefixed to any integer in order to add or subtract that amount instead of setting an exact value." & return
 			with timeout of (10 * 60) seconds
-				display alert t message m buttons b default button 2
+				tell application _app_name
+					display alert t message m buttons b default button 2
+				end tell
 			end timeout
 			set btn_choice to button returned of result
 			if btn_choice is b's item 1 then
@@ -620,7 +638,9 @@ on make_ui(app_model, app_controller) --> View
 				set a to _model's get_height()
 			end if
 
-			display dialog m with title _dialog_title default answer a
+			tell application _app_name
+				display dialog m with title _dialog_title default answer a
+			end tell
 			set action_input to text returned of result
 
 			if action_event is _custom_options's item 1 then
