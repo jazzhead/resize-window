@@ -93,7 +93,8 @@ on make_app_controller() --> Controller
 				register_product(make_webkit_window())
 			end tell
 
-			set app_model to app_factory's make_window(my Util's get_front_app_name()) --> Model
+			set apps_to_ignore to {"Script Editor", "AppleScript Editor", "Terminal"}
+			set app_model to app_factory's make_window(my Util's get_front_app_name(apps_to_ignore)) --> Model
 			set view_controller to make_view_controller(app_model) --> Controller
 			set app_view to make_ui(app_model, view_controller) --> View
 
@@ -923,15 +924,16 @@ script Util -- Utility Functions
 		end if
 	end handle_termination
 
-	on get_front_app_name() --> string
+	on get_front_app_name(apps_to_ignore) --> string
 		tell application "System Events"
 
-			-- Ignore (Apple)Script Editor and Terminal when getting the front
-			-- app name since most of the time they will just be used during
-			-- development and testing to run the script.
+			-- Ignore given list of apps (usually (Apple)Script Editor and
+			-- Terminal) when getting the front app name. Usually the ignored
+			-- apps are mostly just used during development and testing to run
+			-- the script.
 			repeat 10 times -- limit repetitions just in case
 				set frontmost_process to first process where it is frontmost
-				if short name of frontmost_process is in {"Script Editor", "AppleScript Editor", "Terminal"} then
+				if short name of frontmost_process is in apps_to_ignore then
 					set original_process to frontmost_process
 					set visible of original_process to false
 					repeat while (original_process is frontmost)
