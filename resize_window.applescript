@@ -77,6 +77,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AN
 
 on run -- main
 	run make_app_controller() --> Controller
+	Util's handle_termination() -- XXX
 end run
 
 (* ==== MVC Classes ==== *)
@@ -889,7 +890,39 @@ end make_textedit_window*)
 
 (* ==== Miscellaneous Classes ==== *)
 
+-- XXX: This hack does not work. Apparently, a Standard Additions command can't
+-- be overridden if it's triggered internally by AppleScript rather than called
+-- by the script. See the handle_termination() handler for another workaround
+-- and details about the reason it's needed.
+(*on choose application --with prompt _msg
+	display dialog "DEBUG: " --& _msg
+	return missing value
+end choose application*)
+
 script Util -- Utility Functions
+	on handle_termination() --> void
+		-- XXX: Hack to prevent \"Choose Application\" dialog for missing apps
+		--
+		-- See: http://lists.apple.com/archives/applescript-users/2008/Mar/msg00225.html
+		--
+		-- Suggestions for a better solution welcome. One idea might be to
+		-- implement support for third-party apps as a script plug-in for each
+		-- app that a user can choose to install, but that would require coding
+		-- up a whole plug-in infrastructure and make the installation process
+		-- more complicated. Would probably also need to write an installer to
+		-- make installation easier. For now, this hack is probably good enough
+		-- unless any issues with it are reported.
+		--
+		-- NOTE: Suppress the error when running the script from Script Editor.
+		--
+		if current application's name is not in {"Script Editor", "AppleScript Editor"} then
+			set err_msg to "Not really an error, just a hack to prevent a \"Choose Application\" dialog for missing apps."
+			--set err_num to -1708 -- errAEEventNotHandled = "AppleEvent not handled by any handler"
+			set err_num to -128 -- "User canceled" (so FastScripts will ignore it)
+			error err_msg number err_num
+		end if
+	end handle_termination
+
 	on get_front_app_name() --> string
 		tell application "System Events"
 
