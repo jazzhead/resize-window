@@ -57,8 +57,17 @@ HTML_LAYOUT  := $(DOC_DIR)/layout.erb
 FPO_DIR       = dev/fpo
 # Temporary file
 HTML_FILE    := $(DOC_DIR)/readme.html
+
 # ed commands for tweaking RTF formatting
-ED_COMMANDS  := $(DOC_DIR)/doc.ed.txt
+OS_VERSION   := $(shell sw_vers -productVersion)
+OS_MINIMUM   := 10.11    # El Capitan had new RTF formatting syntax
+ifeq ($(shell printf "%s\n" $(OS_MINIMUM) $(OS_VERSION)), \
+	  $(shell printf "%s\n" $(OS_MINIMUM) $(OS_VERSION)   \
+	    | sort -t '.' -k 1,1 -k 2,2 -k 3,3 -k 4,4 -g))
+	ED_COMMANDS := $(DOC_DIR)/doc.ed.1011.txt # for OS X 10.11 and later
+else
+	ED_COMMANDS := $(DOC_DIR)/doc.ed.txt      # for earlier OS X
+endif
 
 # Output file paths
 PROG         := $(BUILD)/$(TARGET)
@@ -157,8 +166,8 @@ $(DOC_TARGET): $(HTML_FILE)
 	@$(RM) $<
 	@echo "--->  Tweaking RTF documentation formatting with 'ed' commands..."
 	@$(ED) $(DOC_TARGET)/TXT.rtf < $(ED_COMMANDS) >/dev/null 2>&1
-	@touch -r "$(DOC_DIR)/readme.md" "$@"
-	@touch -r "$(DOC_DIR)/readme.md" $(DOC_TARGET)/TXT.rtf
+	@touch -r "$(SOURCE)" "$@"
+	@touch -r "$(SOURCE)" $(DOC_TARGET)/TXT.rtf
 	@echo "--->  Deleting temporary scaled images..."
 	@$(RM) "$(BUILD)/img"
 
