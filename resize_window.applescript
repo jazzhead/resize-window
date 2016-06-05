@@ -734,9 +734,10 @@ on make_supported_app() --> abstract product
 			end using terms from
 		end reset_gui
 
-		on set_default_alert() --> void
+		on set_default_alert(extra_msg) --> void
 			set t to "Couldn't target window content area for resizing"
-			set m to "The height of the content area of the window could not be resized to the selected mobile dimensions, so the overall window frame height was resized instead." & return & return & "Try enabling JavaScript if it's not already enabled and rerun the script."
+			set m to "The height of the content area of the window could not be resized to the selected mobile dimensions, so the overall window frame height was resized instead." & return & return & "If you would like the content area resizing feature, try enabling JavaScript in your web browser if it's not already enabled and rerun the script."
+			if extra_msg is not "" then set m to m & space & extra_msg
 			set_alert(t, m)
 		end set_default_alert
 
@@ -759,6 +760,10 @@ on make_safari_window() --> concrete product
 			-- window bounds
 			if my is_mobile() and not my is_width_only() then
 				set doc_height to 0
+				set extra_alert_msg to ""
+
+				set os_version to system version of (system info)
+				tell application "Safari" to set safari_version to version
 
 				-- First try GUI scripting since it doesn't require JavaScript
 				-- to be enabled
@@ -768,9 +773,70 @@ on make_safari_window() --> concrete product
 						tell application "System Events" to tell application process (my _app_name)
 							set frontmost to true
 							my reset_gui(it)
+							-- GUI scripting is very fragile. Software updates
+							-- (both application and OS) frequently break it as
+							-- evidenced by all the different methods below
+							-- needed to access the browser content area across
+							-- different versions of OS X and Safari.
+							considering numeric strings -- for version strings
+								if safari_version < "9" or os_version < "10.10" then
+									set {err_msg, err_num} to {missing value, missing value}
+									-- The window group number depends on what
+									-- combination of Favorites Bar and Status
+									-- Bar (either, both, or none) is showing,
+									-- so try until hopefully the right
+									-- combination is found.
+									repeat with i from 1 to 3
+										--log "Trying AXGroup " & i & "..."
+										try
+											set ui_target to window 1's group i's group 1's group 1's scroll area 1
+											set {err_msg, err_num} to {missing value, missing value}
+											exit repeat
+										on error err_msg number err_num
+											--log "Error: AXGroup " & i & " failed"
+										end try
+									end repeat
+									if {err_msg, err_num} is not {missing value, missing value} then
+										error err_msg number err_num
+									end if
+								else if os_version < "10.11" then
+									-- Safari 9 on OS X 10.10 changed one
+									-- element (to an AXTabGroup rather than
+									-- one of many AXGroup elements),
+									-- eliminating the need for a loop.
+									set ui_target to window 1's tab group 1's group 1's group 1's scroll area 1
+								else
+									-- El Capitan added an AXSplitGroup, but
+									-- kept the rest of the UI element
+									-- hierarchy the same as Yosemite.
+									set ui_target to window 1's splitter group 1's tab group 1's group 1's group 1's scroll area 1
+								end if
+							end considering
 							--tell window 1's scroll area 1 -- DEBUG: cause error for testing
-							tell window 1's tab group 1's group 1's group 1's scroll area 1
-								set doc_height to (attribute "AXSize"'s value as list)'s last item
+							tell ui_target
+								-- Unfortunately, there is no "web area" UI
+								-- element in the standard accessibility API or
+								-- it could have just been targeted above like
+								-- all the other elements. AXWebArea is a
+								-- custom WebKit/Safari element and has to be
+								-- found by a UI element's role, so tack on
+								-- that extra element here.
+								if UI element 1's role is "AXWebArea" then
+									-- Required for Safari 8 on Yosemite
+									-- because the web area dimensions can
+									-- include more than the visible scroll
+									-- area dimensions. The dimensions don't
+									-- exceed the scroll area on later
+									-- versions.
+									set inner_target to UI element 1
+								else
+									-- As a fallback, if there's no AXWebArea,
+									-- just try the AXScrollArea.
+									set inner_target to it
+								end if
+								tell inner_target
+									set doc_height to (attribute "AXSize"'s value as list)'s last item
+								end tell
 							end tell
 						end tell
 						exit repeat
@@ -788,15 +854,31 @@ on make_safari_window() --> concrete product
 								set doc_height to (do JavaScript my _js in document 1) as integer
 							end tell
 						end using terms from
+					on error err_msg number err_num
+						considering numeric strings -- version strings
+							set is_at_least_safari_9_1_1 to safari_version is greater than or equal to "9.1.1"
+						end considering
+						if is_at_least_safari_9_1_1 and err_num is 8 then
+							-- As of Safari 9.1.1 (on Yosemite or later), the
+							-- default is to disallow JavaScript from Apple
+							-- Events, so the user must specifically enable
+							-- that functionality. (Safari 9.1.1 also runs on
+							-- Mavericks, but does not include the new
+							-- restriction and thus does not return error
+							-- number 8.)
+							set extra_alert_msg to "As of Safari 9.1.1, you will also need to:" & return & return Â
+								& "    ¥ Enable the Develop menu in Safari if not already enabled in Safari's Advanced preferences." & return & return Â
+								& "    ¥ Enable \"Allow JavaScript from Apple Events\" in Safari's Develop menu." & return
+						end if
 					end try
 				end if
 
 				if doc_height > 0 then
 					my adjust_height((my _height) - doc_height)
 				else
-					my set_default_alert()
+					my set_default_alert(extra_alert_msg)
 				end if
-			end if
+			end if -- my is_mobile() and not my is_width_only()
 		end calculate_size
 	end script
 end make_safari_window
@@ -821,6 +903,7 @@ on make_chrome_window() --> concrete product
 			-- window bounds
 			if my is_mobile() and not my is_width_only() then
 				set doc_height to 0
+				set extra_alert_msg to ""
 				-- Google Chrome doesn't provide access to the dimensions of
 				-- the window scroll area via UI Scripting, so try JavaScript
 				-- instead.
@@ -834,7 +917,7 @@ on make_chrome_window() --> concrete product
 				if doc_height > 0 then
 					my adjust_height((my _height) - doc_height)
 				else
-					my set_default_alert()
+					my set_default_alert(extra_alert_msg)
 				end if
 			end if
 		end calculate_size
