@@ -1153,20 +1153,25 @@ script UI_Scripting -- UI Scripting Helpers
 	on safari_8_chrome_height(ui_scroll_area)
 		--log "safari_8_chrome_height(ui_scroll_area)"
 		--error "[DEBUG] throwing safari_8_chrome_height() error" -- catch in caller
+
 		set {x, y, w, h} to {1, 2, 3, 4} -- AXFrame indexes
 		using terms from application "System Events"
 			set scroll_area_frame to ui_scroll_area's attribute "AXFrame"'s value as list
 			set window_frame to ui_scroll_area's attribute "AXWindow"'s value's attribute "AXFrame"'s value as list
 			set parent_frame to ui_scroll_area's attribute "AXParent"'s value's attribute "AXFrame"'s value as list
 		end using terms from
+
 		(*log "AXScrollArea.AXFrame.y = " & scroll_area_frame's item y
 		log "AXWindow.AXFrame.y = " & window_frame's item y
 		log "AXWindow.AXFrame.h = " & window_frame's item h
 		log "AXParent.AXFrame.h = " & parent_frame's item h*)
+
 		set top_chrome_height to (scroll_area_frame's item y) - (window_frame's item y)
 		set btm_chrome_height to (window_frame's item h) - (parent_frame's item h)
+
 		(*log "top_chrome_height = " & top_chrome_height
 		log "btm_chrome_height = " & btm_chrome_height*)
+
 		return top_chrome_height + btm_chrome_height
 	end safari_8_chrome_height
 
@@ -1176,17 +1181,29 @@ script UI_Scripting -- UI Scripting Helpers
 	-- @return Array of UI elements matching the search roles
 	--
 	on ui_elements_of_roles(ui_element, ui_search_roles)
+		-- Couldn't find any variation of this that worked
+		(*using terms from application "System Events"
+			return (UI elements of ui_element whose role is in ui_search_roles)
+		end using terms from*)
+		--
 		-- Can't find any variation of  '... whose role is in {"AXGroup",
 		-- "AXTabGroup", ...}' that works, so need to loop through each
 		-- individual 'whose' comparison.  Still faster than looping through
-		-- every item without a 'whose' filter though.
+		-- every item without a 'whose' filter, but concatenating lists
+		-- is slow.
+		--
 		set ui_elements to {}
-		repeat with this_role in ui_search_roles
+		script s -- list speed hack
+			-- These lists don't appear to be the source of any major slow-downs though.
+			property ui_elements_ref : ui_elements
+			property ui_search_roles_ref : ui_search_roles
+		end script
+		repeat with this_role in s's ui_search_roles_ref
 			using terms from application "System Events"
-				set ui_elements to ui_elements & (every UI element of ui_element whose role is this_role)
+				set s's ui_elements_ref to s's ui_elements_ref & (get every UI element of ui_element whose role is this_role)
 			end using terms from
 		end repeat
-		return ui_elements
+		return s's ui_elements_ref's contents
 	end ui_elements_of_roles
 
 
@@ -1201,12 +1218,18 @@ script UI_Scripting -- UI Scripting Helpers
 	-- and reliable way to determine the correct one.
 	--
 	on find_ui_scroll_area_in_roles(ui_element, ui_search_roles)
+		-- Lists populated by find_ui_element() call
 		set web_areas to {} -- web area parent scroll area preferred
 		set scroll_areas to {} -- fallback
 
+		-- List of UI elements matching AXRoles in given list
 		set ui_elements to my ui_elements_of_roles(ui_element, ui_search_roles)
 
-		set {scroll_areas, web_areas} to find_ui_element(ui_search_roles, ui_elements, {"AXScrollArea", "AXWebArea"}, {scroll_areas, web_areas}, 0)
+		-- Search recursively in for UI elements matching given roles.
+		-- Modifies {scroll_areas, web_areas} in place. No need to capture
+		-- return value because AppleScript passes lists to handlers by
+		-- reference.
+		find_ui_element(ui_search_roles, ui_elements, {"AXScrollArea", "AXWebArea"}, {scroll_areas, web_areas}, 0)
 
 		set this_scroll_area to missing value
 
@@ -1216,10 +1239,12 @@ script UI_Scripting -- UI Scripting Helpers
 			using terms from application "System Events"
 				--log ("== " & this_web_area's role as text) & " =="
 				set web_area_parent to this_web_area's attribute "AXParent"'s value
+
 				(*log ("---- " & web_area_parent's role as text) & " ----"
 				log web_area_parent's attribute "AXSize"'s value as list
 				log ("---- " & this_web_area's role as text) & " ----"
 				log this_web_area's attribute "AXSize"'s value as list*)
+
 				if (web_area_parent's role as text) is "AXScrollArea" then
 					return web_area_parent
 				end if
@@ -1229,6 +1254,7 @@ script UI_Scripting -- UI Scripting Helpers
 		-- scroll area fallback if no web area found
 		if (count of scroll_areas) = 1 then
 			set this_scroll_area to scroll_areas's item 1
+
 			(*using terms from application "System Events"
 				log ("== " & this_scroll_area's role as text) & " =="
 				log this_scroll_area's attribute "AXSize"'s value as list
@@ -1250,25 +1276,48 @@ script UI_Scripting -- UI Scripting Helpers
 	-- @return element_arrays Array from argument, but populated with UI elements matching ui_roles.
 	--
 	on find_ui_element(ui_search_roles, ui_elements, ui_roles, element_arrays, ui_idx)
-		set ui_idx to ui_idx + 1
+		set ui_idx to ui_idx + 1 -- for recursion debugging
+
+		script s -- list speed hack
+			-- This list doesn't appear to be the source of any major
+			-- slow-downs though.  The recursion is probably the slow bit. Or
+			-- maybe it's just UI Scripting in general that's so slow.
+			property ui_elements_ref : ui_elements
+
+			-- This is probably not necessary at all for this script since the
+			-- array should only be an array of a couple of arrays containing
+			-- one or two items each. Testing it doesn't show any noticeable
+			-- speed difference.
+			--property element_arrays_ref : element_arrays
+		end script
+
 		using terms from application "System Events"
-			repeat with this_element in ui_elements
+			repeat with this_element in s's ui_elements_ref
 				--log "[UI level " & ui_idx & "] " & this_element's role as text
+
 				-- Find element:
+				--
 				repeat with i from 1 to ui_roles's length
 					set this_role to ui_roles's item i
 					set this_array to element_arrays's item i
+					(*script s2 -- list speed hack
+						-- This doesn't seem to make any difference
+						property this_array : s's element_arrays_ref's item i
+					end script*)
 					if (this_element's role as text) is this_role then
 						--log "[UI level " & ui_idx & "] Found an " & this_element's role as text
 						set end of this_array to this_element's contents -- 'contents' = dereference
+						--set end of s2's this_array to this_element's contents
 					end if
 				end repeat
+
 				-- Recursively search for more elements:
+				--
 				-- DO NOT recurse inside an AXWebArea. If multiple tabs are
 				-- open, that's a multi-minute operation
 				if (this_element's role as text) is not "AXWebArea" then
-					set these_ui_elements to my ui_elements_of_roles(this_element, ui_search_roles)
-					my find_ui_element(ui_search_roles, these_ui_elements, ui_roles, element_arrays, ui_idx)
+					set these_ui_elements to ui_elements_of_roles(this_element, ui_search_roles)
+					find_ui_element(ui_search_roles, these_ui_elements, ui_roles, element_arrays, ui_idx)
 				end if
 			end repeat
 		end using terms from
