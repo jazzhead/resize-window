@@ -758,6 +758,7 @@ on make_safari_window() --> concrete product
 
 		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
+
 			-- Resize mobile sizes by the window content area instead of the
 			-- window bounds
 			if my is_mobile() and not my is_width_only() then
@@ -766,29 +767,58 @@ on make_safari_window() --> concrete product
 				set extra_alert_msg to ""
 
 				set os_version to system version of (system info)
-				tell application "Safari" to set safari_version to version
+				tell application (my _app_name) to set app_version to version
 
-				-- First try GUI scripting since it doesn't require JavaScript
-				-- to be enabled
-				--
+				-- Try JavaScript first since it's faster than GUI Scripting
+
+				--log "calculate_size(): trying JavaScript"
+				try
+					using terms from application "Safari"
+						tell application (my _app_name)
+							set doc_height to (do JavaScript my _js in document 1) as integer
+						end tell
+					end using terms from
+				on error err_msg number err_num
+					considering numeric strings -- version strings
+						set is_at_least_safari_9_1_1 to app_version is greater than or equal to "9.1.1"
+					end considering
+					if is_at_least_safari_9_1_1 and err_num is 8 then
+						--
+						-- As of Safari 9.1.1 (on Yosemite or later), the
+						-- default is to disallow JavaScript from Apple Events,
+						-- so the user must specifically enable that
+						-- functionality. (Safari 9.1.1 also runs on Mavericks,
+						-- but does not include the new restriction and thus
+						-- does not return error number 8.)
+						--
+						set extra_alert_msg to "As of Safari 9.1.1, you will also need to:" & return & return Â
+							& "    ¥ Enable the Develop menu in Safari if not already enabled in Safari's Advanced preferences." & return & return Â
+							& "    ¥ Enable \"Allow JavaScript from Apple Events\" in Safari's Develop menu." & return
+					end if
+				end try
+
+				if doc_height > 0 then
+					--log "calculate_size(): adjusting height with JavaScript result"
+					my adjust_height((my _height) - doc_height)
+					return
+				end if
+
+				-- If JavaScript failed, try GUI scripting
+
 				my UI_Scripting's gui_scripting_status()
 				tell application "System Events" to tell application process (my _app_name)
 					set frontmost to true
 					my reset_gui(it)
 					tell window 1 to set ui_element to it
 				end tell
-				--
-				-- This recursive search for the AXScrollArea is slower the
-				-- previous method, but this method is more flexible and less
-				-- likely to break with OS and app updates.
-				--
-				set ui_search_roles to {"AXTabGroup", "AXGroup", "AXScrollArea", "AXWebArea", "AXSplitGroup", "AXUnknown"}
-				set ui_scroll_area to my UI_Scripting's find_ui_scroll_area_in_roles(ui_element, ui_search_roles)
-				--
+
+				set ui_scroll_area to _find_scroll_area(ui_element, app_version, os_version)
+				--log "calculate_size(): ui_scroll_area = " & ui_scroll_area's class
+
 				if ui_scroll_area is not missing value then
-					--log "UI Scripting can be used"
+					--log "calculate_size(): UI Scripting can be used"
 					considering numeric strings -- version strings
-						if safari_version is greater than or equal to 8 and safari_version < 9 then
+						if app_version is greater than or equal to 8 and app_version < 9 then
 							--
 							-- Safari 8 has a major accessibility bug requiring
 							-- lots of hoop jumping. The bug is that
@@ -827,42 +857,12 @@ on make_safari_window() --> concrete product
 					end considering
 				end if -- ui_scroll_area is not missing value
 
-				-- If GUI Scripting fails (possibly because of changes between
-				-- app versions), try JavaScript
-				--
-				if doc_height = 0 and window_chrome_height = 0 then
-					--log "GUI Scripting failed; trying JavaScript"
-					try
-						using terms from application "Safari"
-							tell application (my _app_name)
-								set doc_height to (do JavaScript my _js in document 1) as integer
-							end tell
-						end using terms from
-					on error err_msg number err_num
-						considering numeric strings -- version strings
-							set is_at_least_safari_9_1_1 to safari_version is greater than or equal to "9.1.1"
-						end considering
-						if is_at_least_safari_9_1_1 and err_num is 8 then
-							--
-							-- As of Safari 9.1.1 (on Yosemite or later), the
-							-- default is to disallow JavaScript from Apple
-							-- Events, so the user must specifically enable
-							-- that functionality. (Safari 9.1.1 also runs on
-							-- Mavericks, but does not include the new
-							-- restriction and thus does not return error
-							-- number 8.)
-							--
-							set extra_alert_msg to "As of Safari 9.1.1, you will also need to:" & return & return Â
-								& "    ¥ Enable the Develop menu in Safari if not already enabled in Safari's Advanced preferences." & return & return Â
-								& "    ¥ Enable \"Allow JavaScript from Apple Events\" in Safari's Develop menu." & return
-						end if
-					end try
-				end if -- doc_height = 0 and window_chrome_height = 0
-
 				if window_chrome_height > 0 then
-					--log "Adding window chrome (" & window_chrome_height & ") to target height"
+					--log "calculate_size(): GUI Scripting adding window chrome (" & Â
+					--window_chrome_height & ") to target height"
 					my set_height((my get_new_height()) + window_chrome_height)
 				else if doc_height > 0 then
+					--log "calculate_size(): adjusting height with GUI Scripting result"
 					--log "Adjusting height using scroll area height: " & doc_height
 					my adjust_height((my _height) - doc_height)
 				else
@@ -870,6 +870,102 @@ on make_safari_window() --> concrete product
 				end if
 			end if -- my is_mobile() and not my is_width_only()
 		end calculate_size
+
+		(* == Private == *)
+
+		on _find_scroll_area(ui_element, app_version, os_version)
+			set ui_scroll_area to missing value
+
+			repeat with idx from 1 to 10 -- give GUI scripting up to a second
+				--
+				-- GUI scripting is very fragile. Software updates (both
+				-- application and OS) frequently break it as evidenced by all
+				-- the different methods below needed to access the browser
+				-- content area across different versions of OS X and Safari.
+
+				-- Try targeted searches for known/tested OS/app versions first
+				-- since it will be quicker. If the targeted searches fail, a
+				-- generic recursive search of all UI elements for a scroll
+				-- area containing a web area will be tried. That will be much
+				-- slower.
+				--
+				--log "_find_scroll_area(ui_element): try #" & idx
+				try
+					considering numeric strings -- for version strings
+						if app_version < "9" or os_version < "10.10" then
+							--log "app_version < 9 or os_version < 10.10"
+							--
+							-- The window group number depends on what
+							-- combination of Favorites Bar and Status Bar
+							-- (either, both, or none) is showing, so try until
+							-- hopefully the right combination is found.
+							--
+							set {err_msg, err_num} to {missing value, missing value}
+							repeat with i from 1 to 3
+								--log "Trying AXGroup " & i & "..."
+								using terms from application "System Events"
+									try
+										set ui_scroll_area to ui_element's group i's group 1's group 1's scroll area 1
+										set {err_msg, err_num} to {missing value, missing value}
+										exit repeat
+										--on error err_msg number err_num
+										--log "Error: AXGroup " & i & " failed"
+									end try
+								end using terms from
+							end repeat
+							if {err_msg, err_num} is not {missing value, missing value} then
+								error err_msg number err_num
+							end if
+						else if os_version < "10.11" then
+							--log "os_version < 10.11"
+							--
+							-- Safari 9 on OS X 10.10 changed one element (to
+							-- an AXTabGroup rather than one of many AXGroup
+							-- elements), eliminating the need for a loop.
+							--
+							using terms from application "System Events"
+								set ui_scroll_area to ui_element's tab group 1's group 1's group 1's scroll area 1
+							end using terms from
+						else
+							--log "os_version >= 10.11"
+							--
+							-- El Capitan added an AXSplitGroup, but kept the
+							-- rest of the UI element hierarchy the same as
+							-- Yosemite.
+							--
+							using terms from application "System Events"
+								set ui_scroll_area to ui_element's splitter group 1's tab group 1's group 1's group 1's scroll area 1
+							end using terms from
+						end if
+					end considering
+					exit repeat
+				on error
+					delay 0.1 -- give the UI time to catch up
+				end try
+			end repeat
+
+			-- Make sure the found scroll area contains a web area
+			if ui_scroll_area is not missing value then
+				if not (my UI_Scripting's contains_web_area(ui_scroll_area)) then
+					set ui_scroll_area to missing value
+				end if
+			end if
+			--set ui_scroll_area to missing value -- :DEBUG: test recursive search
+
+			--
+			-- If the targeted searches above for a scroll area (containing a
+			-- web area) did not work, fall back to a recursive search of all
+			-- UI elements as a last resort. It will be much slower though.
+			--
+			--
+			if ui_scroll_area is missing value then
+				set ui_search_roles to {"AXTabGroup", "AXGroup", "AXScrollArea", "AXWebArea", "AXSplitGroup", "AXUnknown"}
+				set ui_scroll_area to my UI_Scripting's find_ui_scroll_area_in_roles(ui_element, ui_search_roles)
+			end if
+			--set ui_scroll_area to missing value -- :DEBUG: test UI Scripting failure
+
+			return ui_scroll_area
+		end _find_scroll_area
 	end script
 end make_safari_window
 
@@ -1176,6 +1272,19 @@ script UI_Scripting -- UI Scripting Helpers
 	end safari_8_chrome_height
 
 
+	-- Check if a UI Element contains a single web area (more than one would be
+	-- ambiguous)
+	on contains_web_area(ui_element) --> boolean
+		using terms from application "System Events"
+			set web_areas to (get every UI element of ui_element whose role is "AXWebArea")
+			(*repeat with this_web_area in web_areas -- :DEBUG:
+				log this_web_area's role as text
+			end repeat*)
+		end using terms from
+		return (web_areas's length = 1)
+	end contains_web_area
+
+
 	-- @param 1 ui_element UI element whose children should be searched
 	-- @param 2 ui_search_roles Array of UI element roles (strings) to match against
 	-- @return Array of UI elements matching the search roles
@@ -1218,6 +1327,8 @@ script UI_Scripting -- UI Scripting Helpers
 	-- and reliable way to determine the correct one.
 	--
 	on find_ui_scroll_area_in_roles(ui_element, ui_search_roles)
+		--log "find_ui_scroll_area_in_roles()"
+
 		-- Lists populated by find_ui_element() call
 		set web_areas to {} -- web area parent scroll area preferred
 		set scroll_areas to {} -- fallback
