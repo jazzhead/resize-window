@@ -406,6 +406,8 @@ on make_app_window() --> Model
 
 		-- @param int Value to add or substract from window height
 		on adjust_height(val) --> void
+			--log "adjust_height(" & val & ")"
+			--log "adjust_height(): set bottom to " & (_bottom + val)
 			set _bottom to _bottom + val
 		end adjust_height
 
@@ -759,6 +761,7 @@ on make_safari_window() --> concrete product
 			-- Resize mobile sizes by the window content area instead of the
 			-- window bounds
 			if my is_mobile() and not my is_width_only() then
+				set window_chrome_height to 0
 				set doc_height to 0
 				set extra_alert_msg to ""
 
@@ -767,87 +770,68 @@ on make_safari_window() --> concrete product
 
 				-- First try GUI scripting since it doesn't require JavaScript
 				-- to be enabled
-				my Util's gui_scripting_status()
-				repeat 10 times -- until hopefully GUI scripting succeeds
-					try
-						tell application "System Events" to tell application process (my _app_name)
-							set frontmost to true
-							my reset_gui(it)
-							-- GUI scripting is very fragile. Software updates
-							-- (both application and OS) frequently break it as
-							-- evidenced by all the different methods below
-							-- needed to access the browser content area across
-							-- different versions of OS X and Safari.
-							considering numeric strings -- for version strings
-								if safari_version < "9" or os_version < "10.10" then
-									set {err_msg, err_num} to {missing value, missing value}
-									-- The window group number depends on what
-									-- combination of Favorites Bar and Status
-									-- Bar (either, both, or none) is showing,
-									-- so try until hopefully the right
-									-- combination is found.
-									repeat with i from 1 to 3
-										--log "Trying AXGroup " & i & "..."
-										try
-											set ui_target to window 1's group i's group 1's group 1's scroll area 1
-											set {err_msg, err_num} to {missing value, missing value}
-											exit repeat
-										on error err_msg number err_num
-											--log "Error: AXGroup " & i & " failed"
-										end try
-									end repeat
-									if {err_msg, err_num} is not {missing value, missing value} then
-										error err_msg number err_num
-									end if
-								else if os_version < "10.11" then
-									-- Safari 9 on OS X 10.10 changed one
-									-- element (to an AXTabGroup rather than
-									-- one of many AXGroup elements),
-									-- eliminating the need for a loop.
-									set ui_target to window 1's tab group 1's group 1's group 1's scroll area 1
-								else
-									-- El Capitan added an AXSplitGroup, but
-									-- kept the rest of the UI element
-									-- hierarchy the same as Yosemite.
-									set ui_target to window 1's splitter group 1's tab group 1's group 1's group 1's scroll area 1
-								end if
-							end considering
-							--tell window 1's scroll area 1 -- DEBUG: cause error for testing
-							tell ui_target
-								-- Unfortunately, there is no "web area" UI
-								-- element in the standard accessibility API or
-								-- it could have just been targeted above like
-								-- all the other elements. AXWebArea is a
-								-- custom WebKit/Safari element and has to be
-								-- found by a UI element's role, so tack on
-								-- that extra element here.
-								if UI element 1's role is "AXWebArea" then
-									-- Required for Safari 8 on Yosemite
-									-- because the web area dimensions can
-									-- include more than the visible scroll
-									-- area dimensions. The dimensions don't
-									-- exceed the scroll area on later
-									-- versions.
-									set inner_target to UI element 1
-								else
-									-- As a fallback, if there's no AXWebArea,
-									-- just try the AXScrollArea.
-									set inner_target to it
-								end if
-								tell inner_target
-									set doc_height to (attribute "AXSize"'s value as list)'s last item
-								end tell
-							end tell
-						end tell
-						exit repeat
-					on error
-						delay 0.1 -- give the UI time to catch up
-					end try
-				end repeat
+				--
+				my UI_Scripting's gui_scripting_status()
+				tell application "System Events" to tell application process (my _app_name)
+					set frontmost to true
+					my reset_gui(it)
+					tell window 1 to set ui_element to it
+				end tell
+				--
+				-- This recursive search for the AXScrollArea is slower the
+				-- previous method, but this method is more flexible and less
+				-- likely to break with OS and app updates.
+				--
+				set ui_search_roles to {"AXTabGroup", "AXGroup", "AXScrollArea", "AXWebArea", "AXSplitGroup", "AXUnknown"}
+				set ui_scroll_area to my UI_Scripting's find_ui_scroll_area_in_roles(ui_element, ui_search_roles)
+				--
+				if ui_scroll_area is not missing value then
+					--log "UI Scripting can be used"
+					considering numeric strings -- version strings
+						if safari_version is greater than or equal to 8 and safari_version < 9 then
+							--
+							-- Safari 8 has a major accessibility bug requiring
+							-- lots of hoop jumping. The bug is that
+							-- AXScrollArea reports an incorrect value for its
+							-- AXSize (it includes more than just its visible
+							-- scroll area). So values from a bunch of other
+							-- properties are needed instead to make the
+							-- calculations.
+							--
+							-- Note: Instead of calling this workaround method,
+							-- the usual ui_element_size() could be used by
+							-- passing it AXScrollArea.AXVerticalScrollBar
+							-- (pseudocode), but that's just relying on another
+							-- (related) Safari 8-specific bug.
+							--
+							try
+								set window_chrome_height to my UI_Scripting's safari_8_chrome_height(ui_scroll_area)
+							on error err_msg number err_num
+								set window_chrome_height to 0
+								--error err_msg number err_num -- debug-only
+							end try
+						else
+							--
+							-- This should work for most other cases and is
+							-- preferred since it requires less work/fewer
+							-- calculations.
+							--
+							try
+								set ui_scroll_size to my UI_Scripting's ui_element_size(ui_scroll_area)
+								set doc_height to ui_scroll_size's last item
+							on error err_msg number err_num
+								set doc_height to 0
+								--error err_msg number err_num -- debug-only
+							end try
+						end if
+					end considering
+				end if -- ui_scroll_area is not missing value
 
 				-- If GUI Scripting fails (possibly because of changes between
 				-- app versions), try JavaScript
-				if doc_height = 0 then
+				--
+				if doc_height = 0 and window_chrome_height = 0 then
+					--log "GUI Scripting failed; trying JavaScript"
 					try
 						using terms from application "Safari"
 							tell application (my _app_name)
@@ -859,6 +843,7 @@ on make_safari_window() --> concrete product
 							set is_at_least_safari_9_1_1 to safari_version is greater than or equal to "9.1.1"
 						end considering
 						if is_at_least_safari_9_1_1 and err_num is 8 then
+							--
 							-- As of Safari 9.1.1 (on Yosemite or later), the
 							-- default is to disallow JavaScript from Apple
 							-- Events, so the user must specifically enable
@@ -866,14 +851,19 @@ on make_safari_window() --> concrete product
 							-- Mavericks, but does not include the new
 							-- restriction and thus does not return error
 							-- number 8.)
+							--
 							set extra_alert_msg to "As of Safari 9.1.1, you will also need to:" & return & return Â
 								& "    ¥ Enable the Develop menu in Safari if not already enabled in Safari's Advanced preferences." & return & return Â
 								& "    ¥ Enable \"Allow JavaScript from Apple Events\" in Safari's Develop menu." & return
 						end if
 					end try
-				end if
+				end if -- doc_height = 0 and window_chrome_height = 0
 
-				if doc_height > 0 then
+				if window_chrome_height > 0 then
+					--log "Adding window chrome (" & window_chrome_height & ") to target height"
+					my set_height((my get_new_height()) + window_chrome_height)
+				else if doc_height > 0 then
+					--log "Adjusting height using scroll area height: " & doc_height
 					my adjust_height((my _height) - doc_height)
 				else
 					my set_default_alert(extra_alert_msg)
@@ -959,7 +949,7 @@ end make_firefox_window*)
 		on calculate_size() --> void
 			continue calculate_size() -- call superclass's method first
 			if my is_mobile() and not my is_width_only() then
-				my Util's gui_scripting_status() -- requires GUI scripting
+				my UI_Scripting's gui_scripting_status() -- requires GUI scripting
 				tell application "System Events" to tell application process (my _app_name)
 					tell window 1's scroll area 1's text area 1
 						set doc_height to (attribute "AXSize"'s value as list)'s last item
@@ -1081,7 +1071,9 @@ script Util -- Utility Functions
 			error "Can't join_list(): " & err_msg number err_num
 		end try
 	end join_list
+end script
 
+script UI_Scripting -- UI Scripting Helpers
 	on gui_scripting_status() --> void
 		set os_ver to system version of (system info)
 
@@ -1132,4 +1124,154 @@ script Util -- Utility Functions
 			end try
 		end if
 	end gui_scripting_status
+
+
+	-- @param UI element
+	-- @return list (width, height)
+	on ui_element_size(ui_element)
+		--log "ui_element_size(ui_element)"
+		--error "[DEBUG] throwing ui_element_size() error" -- catch in caller
+		using terms from application "System Events"
+			return ui_element's attribute "AXSize"'s value as list
+		end using terms from
+	end ui_element_size
+
+
+	-- Calculate the window chrome height (top and bottom) for Safari 8.
+	--
+	-- For now, this is only used for working around a Safari 8 accessibility
+	-- bug in which it does not report the correct content area height. It
+	-- requires a lot more work than the ui_element_size() method, and because
+	-- so many different elements are involved, there's no guarantee that this
+	-- method will work for any other version of Safari or other apps. (Update:
+	-- It works with Safari 9, but not Safari 7, so just use it to work around
+	-- the Safari 8 bug.)
+	--
+	-- @param scroll area UI element (AXScrollArea)
+	-- @return integer Window chrome height including top and bottom chrome
+	--
+	on safari_8_chrome_height(ui_scroll_area)
+		--log "safari_8_chrome_height(ui_scroll_area)"
+		--error "[DEBUG] throwing safari_8_chrome_height() error" -- catch in caller
+		set {x, y, w, h} to {1, 2, 3, 4} -- AXFrame indexes
+		using terms from application "System Events"
+			set scroll_area_frame to ui_scroll_area's attribute "AXFrame"'s value as list
+			set window_frame to ui_scroll_area's attribute "AXWindow"'s value's attribute "AXFrame"'s value as list
+			set parent_frame to ui_scroll_area's attribute "AXParent"'s value's attribute "AXFrame"'s value as list
+		end using terms from
+		(*log "AXScrollArea.AXFrame.y = " & scroll_area_frame's item y
+		log "AXWindow.AXFrame.y = " & window_frame's item y
+		log "AXWindow.AXFrame.h = " & window_frame's item h
+		log "AXParent.AXFrame.h = " & parent_frame's item h*)
+		set top_chrome_height to (scroll_area_frame's item y) - (window_frame's item y)
+		set btm_chrome_height to (window_frame's item h) - (parent_frame's item h)
+		(*log "top_chrome_height = " & top_chrome_height
+		log "btm_chrome_height = " & btm_chrome_height*)
+		return top_chrome_height + btm_chrome_height
+	end safari_8_chrome_height
+
+
+	-- @param 1 ui_element UI element whose children should be searched
+	-- @param 2 ui_search_roles Array of UI element roles (strings) to match against
+	-- @return Array of UI elements matching the search roles
+	--
+	on ui_elements_of_roles(ui_element, ui_search_roles)
+		-- Can't find any variation of  '... whose role is in {"AXGroup",
+		-- "AXTabGroup", ...}' that works, so need to loop through each
+		-- individual 'whose' comparison.  Still faster than looping through
+		-- every item without a 'whose' filter though.
+		set ui_elements to {}
+		repeat with this_role in ui_search_roles
+			using terms from application "System Events"
+				set ui_elements to ui_elements & (every UI element of ui_element whose role is this_role)
+			end using terms from
+		end repeat
+		return ui_elements
+	end ui_elements_of_roles
+
+
+	-- @param 1 ui_element UI element whose children should be searched
+	-- @param 2 ui_search_roles Array of UI element roles (strings) to match
+	-- @return An AXScrollArea UI element or 'missing value' if not found
+	--
+	-- If there is only one web area and its parent is a scroll area, that
+	-- scroll area is probably what we're looking for. Otherwise, if there is
+	-- only one scroll area, that's probably a good fallback to try. If there
+	-- is more than one web area or scroll area, then there's probaly no easy
+	-- and reliable way to determine the correct one.
+	--
+	on find_ui_scroll_area_in_roles(ui_element, ui_search_roles)
+		set web_areas to {} -- web area parent scroll area preferred
+		set scroll_areas to {} -- fallback
+
+		set ui_elements to my ui_elements_of_roles(ui_element, ui_search_roles)
+
+		set {scroll_areas, web_areas} to find_ui_element(ui_search_roles, ui_elements, {"AXScrollArea", "AXWebArea"}, {scroll_areas, web_areas}, 0)
+
+		set this_scroll_area to missing value
+
+		-- web area parent scroll area preferred
+		if (count of web_areas) = 1 then
+			set this_web_area to web_areas's item 1
+			using terms from application "System Events"
+				--log ("== " & this_web_area's role as text) & " =="
+				set web_area_parent to this_web_area's attribute "AXParent"'s value
+				(*log ("---- " & web_area_parent's role as text) & " ----"
+				log web_area_parent's attribute "AXSize"'s value as list
+				log ("---- " & this_web_area's role as text) & " ----"
+				log this_web_area's attribute "AXSize"'s value as list*)
+				if (web_area_parent's role as text) is "AXScrollArea" then
+					return web_area_parent
+				end if
+			end using terms from
+		end if
+
+		-- scroll area fallback if no web area found
+		if (count of scroll_areas) = 1 then
+			set this_scroll_area to scroll_areas's item 1
+			(*using terms from application "System Events"
+				log ("== " & this_scroll_area's role as text) & " =="
+				log this_scroll_area's attribute "AXSize"'s value as list
+			end using terms from*)
+		end if
+
+		return this_scroll_area
+	end find_ui_scroll_area_in_roles
+
+
+	-- Search recursively in an array of UI elements for an element matching a
+	-- given role
+	--
+	-- @param 1 ui_search_roles Array of UI element roles to search (needed for recursion)
+	-- @param 2 ui_elements Array of UI elements to search
+	-- @param 3 ui_roles Array of AX roles (as strings) to match against
+	-- @param 4 element_arrays Array of empty arrays to be populated with matches corresponding to ui_roles.
+	-- @param 5 ui_idx Integer for recursively debugging UI element hierarchy. Always start with 0.
+	-- @return element_arrays Array from argument, but populated with UI elements matching ui_roles.
+	--
+	on find_ui_element(ui_search_roles, ui_elements, ui_roles, element_arrays, ui_idx)
+		set ui_idx to ui_idx + 1
+		using terms from application "System Events"
+			repeat with this_element in ui_elements
+				--log "[UI level " & ui_idx & "] " & this_element's role as text
+				-- Find element:
+				repeat with i from 1 to ui_roles's length
+					set this_role to ui_roles's item i
+					set this_array to element_arrays's item i
+					if (this_element's role as text) is this_role then
+						--log "[UI level " & ui_idx & "] Found an " & this_element's role as text
+						set end of this_array to this_element's contents -- 'contents' = dereference
+					end if
+				end repeat
+				-- Recursively search for more elements:
+				-- DO NOT recurse inside an AXWebArea. If multiple tabs are
+				-- open, that's a multi-minute operation
+				if (this_element's role as text) is not "AXWebArea" then
+					set these_ui_elements to my ui_elements_of_roles(this_element, ui_search_roles)
+					my find_ui_element(ui_search_roles, these_ui_elements, ui_roles, element_arrays, ui_idx)
+				end if
+			end repeat
+		end using terms from
+		return element_arrays
+	end find_ui_element
 end script
