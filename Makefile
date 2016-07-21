@@ -54,7 +54,6 @@ ARCHIVE      := $(PACKAGE)-$(VERSION)
 TEXT_FILES    = readme.md LICENSE
 DOC_SRC      := $(patsubst %,$(DOC_DIR)/%,$(TEXT_FILES))
 HTML_LAYOUT  := $(DOC_DIR)/layout.erb
-FPO_DIR       = dev/fpo
 # Temporary file
 HTML_FILE    := $(DOC_DIR)/readme.html
 
@@ -134,7 +133,6 @@ dist: all doc
 	@[ -f "$(ARCHIVE).zip" ] && $(RM) "$(ARCHIVE).zip" || true
 	@$(MKDIR) $(ARCHIVE)
 	@cp -a $(BUILD)/* $(ARCHIVE)
-	@cp -a $(FPO_DIR) $(ARCHIVE)
 	@find $(ARCHIVE) -name .DS_Store -print0 | xargs -0 $(RM)
 	@$(ARCHIVE_CMD) $(ARCHIVE) $(ARCHIVE).zip
 	@$(RM) "$(ARCHIVE)"
